@@ -207,9 +207,6 @@ export default function DashboardPage() {
             <CategoryStrip label="Housing Loans" emoji="🏠" stats={stats.housing}
               color="border-blue-200 bg-blue-50 dark:border-blue-800/50 dark:bg-blue-900/10" />
           </section>
-
-          {/* ── Charts ── */}
-          <PortfolioCharts loans={loans} />
         </>
       )}
 
@@ -243,6 +240,12 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* ── Charts (scoped to the active tab, gold pawn and housing kept separate) ── */}
+      <PortfolioCharts
+        loans={visibleLoans}
+        title={`${TAB_META[activeTab].emoji} ${TAB_META[activeTab].label} — Insights`}
+      />
 
       {/* ── Smart payment splitter entry point (Gold Pawn only) ── */}
       {activeTab === "GOLD_PAWN" && visibleLoans.length > 1 && (

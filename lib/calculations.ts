@@ -134,10 +134,13 @@ export function calcInterestRatio(
  * Strategy:
  *  1. Cover each selected account's accrued interest first (proportionally
  *     if the budget can't cover all of it), so none of them keep compounding.
- *  2. Throw whatever is left at principal — highest interest rate first
- *     (avalanche method), spilling over to the next-highest rate once an
- *     account's principal is fully cleared. This minimizes total interest
- *     paid across the portfolio.
+ *  2. Spread whatever is left across principal in proportion to each
+ *     account's remaining capital — bigger loans get a bigger share of the
+ *     payment, rather than one account (e.g. just the highest rate) eating
+ *     the whole budget. An account that would be overpaid by its share is
+ *     capped at its own remaining principal, and the leftover is
+ *     re-distributed proportionally among the rest (water-filling), so the
+ *     full budget still gets used whenever total capital allows it.
  *
  * Each resulting payment is run back through `processPayment` so the
  * numbers shown to the user are exactly what will be written to the DB.
@@ -175,17 +178,34 @@ export function recommendAllocation(
     }
   }
 
-  // Phase 2 — avalanche: highest rate first, capped at each loan's principal.
-  if (remaining > 0.005) {
-    const byRateDesc = [...withAccrued].sort((a, b) => b.rate - a.rate);
-    for (const l of byRateDesc) {
-      if (remaining <= 0.005) break;
-      const already = assigned.get(l.id) ?? 0;
-      const extra = Math.min(remaining, l.principal);
-      if (extra > 0) {
-        assigned.set(l.id, already + extra);
-        remaining -= extra;
+  // Phase 2 — spread the rest across principal, proportional to capital,
+  // capping any account at its own remaining principal and re-distributing
+  // the leftover among accounts still under their cap (water-filling).
+  let pool = withAccrued.filter((l) => l.principal > 0.005);
+  while (remaining > 0.005 && pool.length > 0) {
+    const totalCapital = pool.reduce((s, l) => s + l.principal, 0);
+    if (totalCapital <= 0.005) break;
+
+    let anyCapped = false;
+    for (const l of pool) {
+      const share = remaining * (l.principal / totalCapital);
+      if (share >= l.principal - 0.005) {
+        const already = assigned.get(l.id) ?? 0;
+        assigned.set(l.id, already + l.principal);
+        remaining -= l.principal;
+        anyCapped = true;
       }
+    }
+
+    if (anyCapped) {
+      pool = pool.filter((l) => (assigned.get(l.id) ?? 0) < l.principal - 0.005);
+    } else {
+      for (const l of pool) {
+        const already = assigned.get(l.id) ?? 0;
+        const share = remaining * (l.principal / totalCapital);
+        assigned.set(l.id, already + share);
+      }
+      remaining = 0;
     }
   }
 

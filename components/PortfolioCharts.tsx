@@ -17,6 +17,7 @@ import type { Loan } from "@/types";
 
 interface Props {
   loans: Loan[];
+  title?: string;
 }
 
 const PIE_COLORS = [
@@ -36,7 +37,7 @@ function CustomTooltip({ active, payload }: any) {
   );
 }
 
-export default function PortfolioCharts({ loans }: Props) {
+export default function PortfolioCharts({ loans, title }: Props) {
   if (loans.length === 0) return null;
 
   const pieData = loans
@@ -55,7 +56,13 @@ export default function PortfolioCharts({ loans }: Props) {
     .sort((a, b) => b.daily - a.daily);
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+    <section className="mb-6">
+      {title && (
+        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
+          {title}
+        </p>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* ── Principal distribution ── */}
       <div className="stat-card">
         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">
@@ -131,6 +138,7 @@ export default function PortfolioCharts({ loans }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
       </div>
     </section>
   );
