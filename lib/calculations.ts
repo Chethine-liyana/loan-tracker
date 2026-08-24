@@ -1,5 +1,5 @@
 import { differenceInDays, differenceInMonths } from "date-fns";
-import type { PaymentResult, EmiBreakdown } from "@/types";
+import type { PaymentResult, EmiBreakdown, PawnAccountInput, AllocationPlan, AllocationItem } from "@/types";
 
 /**
  * Calculate interest accrued from `lastPaymentDate` to today.
@@ -126,6 +126,96 @@ export function calcInterestRatio(
 ): number {
   if (originalLoanValue <= 0) return 0;
   return (totalInterestSoFar / originalLoanValue) * 100;
+}
+
+/**
+ * Recommend how to split a lump sum across several pawning accounts.
+ *
+ * Strategy:
+ *  1. Cover each selected account's accrued interest first (proportionally
+ *     if the budget can't cover all of it), so none of them keep compounding.
+ *  2. Throw whatever is left at principal — highest interest rate first
+ *     (avalanche method), spilling over to the next-highest rate once an
+ *     account's principal is fully cleared. This minimizes total interest
+ *     paid across the portfolio.
+ *
+ * Each resulting payment is run back through `processPayment` so the
+ * numbers shown to the user are exactly what will be written to the DB.
+ */
+export function recommendAllocation(
+  loans: PawnAccountInput[],
+  totalBudget: number
+): AllocationPlan {
+  if (loans.length === 0 || totalBudget <= 0) {
+    return { items: [], totalAssigned: 0, leftover: Math.max(totalBudget, 0) };
+  }
+
+  const withAccrued = loans.map((l) => ({
+    ...l,
+    accrued: calcAccruedInterest(l.principal, l.rate, l.lastPaymentDate),
+    daily: dailyCost(l.principal, l.rate),
+  }));
+
+  const assigned = new Map<string, number>();
+  withAccrued.forEach((l) => assigned.set(l.id, 0));
+
+  let remaining = totalBudget;
+
+  // Phase 1 — cover accrued interest on every selected account.
+  const totalAccrued = withAccrued.reduce((s, l) => s + l.accrued, 0);
+  if (totalAccrued > 0) {
+    if (remaining >= totalAccrued) {
+      withAccrued.forEach((l) => assigned.set(l.id, l.accrued));
+      remaining -= totalAccrued;
+    } else {
+      withAccrued.forEach((l) => {
+        assigned.set(l.id, (l.accrued / totalAccrued) * remaining);
+      });
+      remaining = 0;
+    }
+  }
+
+  // Phase 2 — avalanche: highest rate first, capped at each loan's principal.
+  if (remaining > 0.005) {
+    const byRateDesc = [...withAccrued].sort((a, b) => b.rate - a.rate);
+    for (const l of byRateDesc) {
+      if (remaining <= 0.005) break;
+      const already = assigned.get(l.id) ?? 0;
+      const extra = Math.min(remaining, l.principal);
+      if (extra > 0) {
+        assigned.set(l.id, already + extra);
+        remaining -= extra;
+      }
+    }
+  }
+
+  const items: AllocationItem[] = withAccrued
+    .map((l): AllocationItem | null => {
+      const payment = assigned.get(l.id) ?? 0;
+      if (payment <= 0.005) return null;
+      const result = processPayment(
+        payment,
+        l.principal,
+        l.rate,
+        l.lastPaymentDate,
+        l.totalHistoricalInterestPaid
+      );
+      return {
+        loanId: l.id,
+        assignedPayment: payment,
+        accruedInterest: l.accrued,
+        dailyInterest: l.daily,
+        daysElapsed: daysElapsed(l.lastPaymentDate),
+        principalReduction: result.principal_reduction,
+        newPrincipal: result.new_principal,
+        newTotalInterestPaid: result.new_total_interest_paid,
+      };
+    })
+    .filter((x): x is AllocationItem => x !== null);
+
+  const totalAssigned = items.reduce((s, i) => s + i.assignedPayment, 0);
+
+  return { items, totalAssigned, leftover: Math.max(remaining, 0) };
 }
 
 /**

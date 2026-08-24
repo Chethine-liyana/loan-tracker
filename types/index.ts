@@ -65,3 +65,31 @@ export interface DashboardStats {
   goldPawn: CategoryStats;
   housing: CategoryStats;
 }
+
+// ── Smart payment allocation across multiple pawning accounts ──
+export interface PawnAccountInput {
+  id: string;
+  bank_name: string;
+  ticket_no: string;
+  principal: number;
+  rate: number;
+  lastPaymentDate: string;
+  totalHistoricalInterestPaid: number;
+}
+
+export interface AllocationItem {
+  loanId: string;
+  assignedPayment: number;
+  accruedInterest: number;
+  dailyInterest: number;
+  daysElapsed: number;
+  principalReduction: number;
+  newPrincipal: number;
+  newTotalInterestPaid: number;
+}
+
+export interface AllocationPlan {
+  items: AllocationItem[];
+  totalAssigned: number;
+  leftover: number; // couldn't be usefully allocated (would overpay every selected loan)
+}

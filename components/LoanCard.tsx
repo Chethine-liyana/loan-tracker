@@ -88,7 +88,7 @@ export default function LoanCard({ loan, onUpdated }: Props) {
 
   return (
     <>
-      <div className="card hover:shadow-md transition-shadow duration-200">
+      <div className="card hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
 
         {/* ── Header — always visible ── */}
         <button
@@ -263,6 +263,16 @@ export default function LoanCard({ loan, onUpdated }: Props) {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total interest paid</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white break-all">
                     {formatLKR(loan.total_historical_interest_paid)}
+                  </p>
+                </div>
+
+                <div className="bg-orange-50 dark:bg-orange-900/15 rounded-xl p-3 col-span-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Interest per day</p>
+                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400 break-all">
+                    {formatLKR(daily)}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    ≈ {formatLKR(daily * 30)} / month at the current rate
                   </p>
                 </div>
               </div>

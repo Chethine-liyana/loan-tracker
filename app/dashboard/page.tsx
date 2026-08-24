@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatLKR, calcAccruedInterest, dailyCost } from "@/lib/calculations";
 import LoanCard from "@/components/LoanCard";
 import AddLoanModal from "@/components/AddLoanModal";
+import PaymentPlanner from "@/components/PaymentPlanner";
+import PortfolioCharts from "@/components/PortfolioCharts";
 import type { Loan, LoanType, CategoryStats, DashboardStats } from "@/types";
 
 type Tab = "GOLD_PAWN" | "HOUSING";
@@ -116,6 +118,7 @@ export default function DashboardPage() {
   const [loading,   setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("GOLD_PAWN");
   const [showAdd,   setShowAdd]   = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
 
   const fetchLoans = useCallback(async () => {
     const supabase = createClient();
@@ -204,6 +207,9 @@ export default function DashboardPage() {
             <CategoryStrip label="Housing Loans" emoji="🏠" stats={stats.housing}
               color="border-blue-200 bg-blue-50 dark:border-blue-800/50 dark:bg-blue-900/10" />
           </section>
+
+          {/* ── Charts ── */}
+          <PortfolioCharts loans={loans} />
         </>
       )}
 
@@ -238,6 +244,21 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* ── Smart payment splitter entry point (Gold Pawn only) ── */}
+      {activeTab === "GOLD_PAWN" && visibleLoans.length > 1 && (
+        <button
+          onClick={() => setShowPlanner(true)}
+          className="w-full mb-5 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-700
+                     bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20
+                     text-amber-800 dark:text-amber-300 font-semibold text-sm px-4 py-3
+                     flex items-center justify-center gap-2 transition-all duration-150
+                     hover:border-amber-400 hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <span className="text-lg leading-none">🧮</span>
+          Split a payment across pawn accounts
+        </button>
+      )}
+
       {/* ── Loan cards ── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
@@ -270,6 +291,14 @@ export default function DashboardPage() {
           defaultType={activeTab as LoanType}
           onClose={() => setShowAdd(false)}
           onAdded={fetchLoans}
+        />
+      )}
+
+      {showPlanner && (
+        <PaymentPlanner
+          loans={loans.filter((l) => l.loan_type === "GOLD_PAWN")}
+          onClose={() => setShowPlanner(false)}
+          onApplied={fetchLoans}
         />
       )}
     </>
