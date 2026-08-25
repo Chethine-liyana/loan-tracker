@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
+import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
+import { Plus } from "lucide-react";
 import type { FinCategory, FinBudget } from "@/types/budget";
 
 interface Props {
@@ -20,7 +22,11 @@ interface Props {
 export default function BudgetFormModal({
   userId, categories, existingBudgetCategoryIds, budget, month, year, onClose, onSaved,
 }: Props) {
-  const expenseCategories = categories.filter((c) => c.kind === "EXPENSE" && !c.archived);
+  const [localCategories, setLocalCategories] = useState(categories);
+  useEffect(() => setLocalCategories(categories), [categories]);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+
+  const expenseCategories = localCategories.filter((c) => c.kind === "EXPENSE" && !c.archived);
   const [categoryId, setCategoryId] = useState(budget?.category_id ?? "");
   const [amount, setAmount] = useState(budget?.amount ?? 0);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +35,11 @@ export default function BudgetFormModal({
   const availableCategories = budget
     ? expenseCategories
     : expenseCategories.filter((c) => !existingBudgetCategoryIds.includes(c.id));
+
+  function handleCategoryCreated(cat: FinCategory) {
+    setLocalCategories((prev) => [...prev, cat]);
+    setCategoryId(cat.id);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,11 +96,14 @@ export default function BudgetFormModal({
                     </button>
                   );
                 })}
-                {availableCategories.length === 0 && (
-                  <p className="col-span-4 text-xs text-gray-400 py-2">
-                    Every expense category already has a budget this period.
-                  </p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategory(true)}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-[11px] font-medium text-gray-400 dark:text-gray-500 hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <Plus size={16} />
+                  <span>New</span>
+                </button>
               </div>
             </div>
           )}
@@ -111,6 +125,16 @@ export default function BudgetFormModal({
           </div>
         </form>
       </div>
+
+      {showNewCategory && (
+        <CategoryFormModal
+          userId={userId}
+          defaultKind="EXPENSE"
+          lockKind
+          onClose={() => setShowNewCategory(false)}
+          onSaved={handleCategoryCreated}
+        />
+      )}
     </div>
   );
 }

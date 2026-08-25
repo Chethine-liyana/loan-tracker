@@ -9,12 +9,15 @@ interface Props {
   userId: string;
   category?: FinCategory;
   defaultKind?: CategoryKind;
+  lockKind?: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (category: FinCategory) => void;
   onArchiveToggle?: () => void;
 }
 
-export default function CategoryFormModal({ userId, category, defaultKind = "EXPENSE", onClose, onSaved, onArchiveToggle }: Props) {
+export default function CategoryFormModal({
+  userId, category, defaultKind = "EXPENSE", lockKind = false, onClose, onSaved, onArchiveToggle,
+}: Props) {
   const [name, setName] = useState(category?.name ?? "");
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? defaultKind);
   const [icon, setIcon] = useState(category?.icon ?? "shapes");
@@ -31,12 +34,12 @@ export default function CategoryFormModal({ userId, category, defaultKind = "EXP
     const supabase = createClient();
     const payload = { name: name.trim(), kind, icon, color };
 
-    const { error: dbError } = category
-      ? await supabase.from("fin_categories").update(payload).eq("id", category.id)
-      : await supabase.from("fin_categories").insert({ ...payload, user_id: userId });
+    const { data, error: dbError } = category
+      ? await supabase.from("fin_categories").update(payload).eq("id", category.id).select().single()
+      : await supabase.from("fin_categories").insert({ ...payload, user_id: userId }).select().single();
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
-    onSaved();
+    onSaved(data as FinCategory);
     onClose();
   }
 
@@ -49,6 +52,7 @@ export default function CategoryFormModal({ userId, category, defaultKind = "EXP
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!lockKind && (
           <div className="grid grid-cols-2 gap-2">
             {(["EXPENSE", "INCOME"] as CategoryKind[]).map((k) => (
               <button
@@ -65,6 +69,7 @@ export default function CategoryFormModal({ userId, category, defaultKind = "EXP
               </button>
             ))}
           </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Name</label>

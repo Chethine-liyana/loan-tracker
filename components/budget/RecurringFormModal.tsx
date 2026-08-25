@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
+import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import type { FinAccount, FinCategory, FinRecurring, RecurrenceFrequency } from "@/types/budget";
 
 interface Props {
@@ -29,10 +30,19 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [localCategories, setLocalCategories] = useState(categories);
+  useEffect(() => setLocalCategories(categories), [categories]);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+
   const filteredCategories = useMemo(
-    () => categories.filter((c) => c.kind === kind && !c.archived),
-    [categories, kind]
+    () => localCategories.filter((c) => c.kind === kind && !c.archived),
+    [localCategories, kind]
   );
+
+  function handleCategoryCreated(cat: FinCategory) {
+    setLocalCategories((prev) => [...prev, cat]);
+    setCategoryId(cat.id);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -93,10 +103,13 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Category</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field">
-                <option value="">Select…</option>
-                {filteredCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <div className="flex gap-1.5">
+                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field">
+                  <option value="">Select…</option>
+                  {filteredCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowNewCategory(true)} className="btn-secondary px-2.5" title="New category">+</button>
+              </div>
             </div>
           </div>
 
@@ -147,6 +160,16 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
           </div>
         </form>
       </div>
+
+      {showNewCategory && (
+        <CategoryFormModal
+          userId={userId}
+          defaultKind={kind}
+          lockKind
+          onClose={() => setShowNewCategory(false)}
+          onSaved={handleCategoryCreated}
+        />
+      )}
     </div>
   );
 }

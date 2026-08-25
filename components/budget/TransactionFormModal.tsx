@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
+import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
+import { Plus } from "lucide-react";
 import type { FinAccount, FinCategory, FinTransaction, TransactionKind, RecurrenceFrequency } from "@/types/budget";
 
 interface Props {
@@ -43,10 +45,19 @@ export default function TransactionFormModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [localCategories, setLocalCategories] = useState(categories);
+  useEffect(() => setLocalCategories(categories), [categories]);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+
   const filteredCategories = useMemo(
-    () => categories.filter((c) => c.kind === kind && !c.archived),
-    [categories, kind]
+    () => localCategories.filter((c) => c.kind === kind && !c.archived),
+    [localCategories, kind]
   );
+
+  function handleCategoryCreated(cat: FinCategory) {
+    setLocalCategories((prev) => [...prev, cat]);
+    setCategoryId(cat.id);
+  }
 
   function handleKindChange(k: TransactionKind) {
     setKind(k);
@@ -189,11 +200,14 @@ export default function TransactionFormModal({
                     </button>
                   );
                 })}
-                {filteredCategories.length === 0 && (
-                  <p className="col-span-4 text-xs text-gray-400 py-2">
-                    No {kind.toLowerCase()} categories yet — add one in Settings.
-                  </p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategory(true)}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-[11px] font-medium text-gray-400 dark:text-gray-500 hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <Plus size={16} />
+                  <span>New</span>
+                </button>
               </div>
             </div>
           )}
@@ -245,6 +259,16 @@ export default function TransactionFormModal({
           </div>
         </form>
       </div>
+
+      {showNewCategory && (
+        <CategoryFormModal
+          userId={userId}
+          defaultKind={kind === "TRANSFER" ? "EXPENSE" : kind}
+          lockKind
+          onClose={() => setShowNewCategory(false)}
+          onSaved={handleCategoryCreated}
+        />
+      )}
     </div>
   );
 }
