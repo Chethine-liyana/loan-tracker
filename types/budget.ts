@@ -52,6 +52,7 @@ export interface FinBudget {
   amount: number;
   month: number;
   year: number;
+  recurring: boolean;
   created_at: string;
 }
 

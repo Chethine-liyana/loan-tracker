@@ -11,6 +11,7 @@ import {
 } from "@/lib/budget/calculations";
 import { getIcon } from "@/lib/budget/icons";
 import SummaryCardExport from "@/components/budget/SummaryCardExport";
+import WeeklySpendPanel from "@/components/budget/WeeklySpendPanel";
 import type { FinTransaction, FinCategory, FinAccount, DateRange, FinBudget } from "@/types/budget";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   categories: FinCategory[];
   accounts: FinAccount[];
   budgets: FinBudget[];
+  rawBudgets: FinBudget[]; // unfiltered, so the weekly panel can look at any month
   range: DateRange;
   currency: string;
 }
@@ -26,7 +28,7 @@ interface Props {
 const PIE_COLORS_FALLBACK = ["#f59e0b", "#3b82f6", "#10b981", "#ef4444", "#8b5cf6", "#ec4899"];
 
 export default function OverviewPanel({
-  transactions, allTransactions, categories, accounts, budgets, range, currency,
+  transactions, allTransactions, categories, accounts, budgets, rawBudgets, range, currency,
 }: Props) {
   const trend = buildSpendTrend(transactions, range);
   const breakdown = buildCategoryBreakdown(transactions, categories, "EXPENSE");
@@ -205,6 +207,14 @@ export default function OverviewPanel({
           </div>
         </div>
       </div>
+
+      {/* ── Weekly breakdown ── */}
+      <WeeklySpendPanel
+        allTransactions={allTransactions}
+        rawBudgets={rawBudgets}
+        categories={categories}
+        currency={currency}
+      />
 
       {/* ── Recent transactions ── */}
       <div className="stat-card">

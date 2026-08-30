@@ -88,6 +88,7 @@ export default function BudgetsPanel({ userId, budgets, categories, month, year,
                       <Icon size={14} />
                     </span>
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{b.category.name}</p>
+                    {b.recurring && <span className="text-xs shrink-0" title="Repeats every month">🔁</span>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => setEditing(b)} className="btn-ghost text-xs px-1.5 py-0.5">✏️</button>

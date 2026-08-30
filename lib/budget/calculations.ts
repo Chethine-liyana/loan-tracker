@@ -326,3 +326,72 @@ export function buildMonthlyInflowOutflow(transactions: FinTransaction[], months
 
   return buckets.map(({ label, income, expense }) => ({ label, income, expense }));
 }
+
+// ── Weekly spend within a month ──────────────────────────────────
+export interface WeekSlice {
+  label: string;        // "Week 1"
+  from: string;          // YYYY-MM-DD
+  to: string;            // YYYY-MM-DD
+  total: number;          // total EXPENSE that week
+  breakdown: CategorySlice[];
+}
+
+/**
+ * Splits a calendar month into simple 7-day buckets (days 1-7, 8-14, ...),
+ * so a 31-day month has 5 "weeks" and a 28-day month has 4.
+ */
+export function buildWeeklySpend(
+  transactions: FinTransaction[],
+  categories: FinCategory[],
+  month: number,
+  year: number
+): WeekSlice[] {
+  const daysInMonth = getDaysInMonth(new Date(year, month - 1, 1));
+  const numWeeks = Math.ceil(daysInMonth / 7);
+  const monthStr = String(month).padStart(2, "0");
+
+  const weeks: WeekSlice[] = Array.from({ length: numWeeks }, (_, i) => {
+    const startDay = i * 7 + 1;
+    const endDay = Math.min(startDay + 6, daysInMonth);
+    return {
+      label: `Week ${i + 1}`,
+      from: `${year}-${monthStr}-${String(startDay).padStart(2, "0")}`,
+      to: `${year}-${monthStr}-${String(endDay).padStart(2, "0")}`,
+      total: 0,
+      breakdown: [] as CategorySlice[],
+    };
+  });
+
+  const byWeek: FinTransaction[][] = Array.from({ length: numWeeks }, () => []);
+  for (const t of transactions) {
+    if (t.kind !== "EXPENSE" || !t.date.startsWith(`${year}-${monthStr}`)) continue;
+    const day = Number(t.date.slice(8, 10));
+    const idx = Math.min(Math.floor((day - 1) / 7), numWeeks - 1);
+    byWeek[idx].push(t);
+    weeks[idx].total += t.amount;
+  }
+
+  weeks.forEach((w, i) => {
+    w.breakdown = buildCategoryBreakdown(byWeek[i], categories, "EXPENSE");
+  });
+
+  return weeks;
+}
+
+/** Even split of the remaining budget across the weeks of the month. */
+export function calcWeeklyAllowance(remaining: number, numWeeks: number): number {
+  return numWeeks > 0 ? remaining / numWeeks : 0;
+}
+
+/** The `count` calendar months following (month, year), in order. */
+export function monthsAhead(month: number, year: number, count: number): { month: number; year: number }[] {
+  const out: { month: number; year: number }[] = [];
+  let m = month;
+  let y = year;
+  for (let i = 0; i < count; i++) {
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+    out.push({ month: m, year: y });
+  }
+  return out;
+}

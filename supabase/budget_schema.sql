@@ -60,9 +60,13 @@ CREATE TABLE IF NOT EXISTS public.fin_budgets (
   amount      NUMERIC(14,2) NOT NULL CHECK (amount > 0),
   month       INT NOT NULL CHECK (month BETWEEN 1 AND 12),
   year        INT NOT NULL CHECK (year BETWEEN 2000 AND 2100),
+  recurring   BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, category_id, month, year)
 );
+
+-- Upgrade (safe to re-run): add the recurring flag if this table already existed
+ALTER TABLE public.fin_budgets ADD COLUMN IF NOT EXISTS recurring BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ── Recurring transactions ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.fin_recurring (

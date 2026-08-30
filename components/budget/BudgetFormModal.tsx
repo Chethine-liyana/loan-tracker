@@ -5,8 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
+import { monthsAhead } from "@/lib/budget/calculations";
 import { Plus } from "lucide-react";
 import type { FinCategory, FinBudget } from "@/types/budget";
+
+const FORWARD_FILL_MONTHS = 11; // + the selected month itself = 12 months covered
 
 interface Props {
   userId: string;
@@ -29,6 +32,7 @@ export default function BudgetFormModal({
   const expenseCategories = localCategories.filter((c) => c.kind === "EXPENSE" && !c.archived);
   const [categoryId, setCategoryId] = useState(budget?.category_id ?? "");
   const [amount, setAmount] = useState(budget?.amount ?? 0);
+  const [recurring, setRecurring] = useState(budget?.recurring ?? false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,13 +55,25 @@ export default function BudgetFormModal({
     const supabase = createClient();
 
     const { error: dbError } = budget
-      ? await supabase.from("fin_budgets").update({ amount }).eq("id", budget.id)
+      ? await supabase.from("fin_budgets").update({ amount, recurring }).eq("id", budget.id)
       : await supabase.from("fin_budgets").upsert(
-          { user_id: userId, category_id: categoryId, amount, month, year },
+          { user_id: userId, category_id: categoryId, amount, month, year, recurring },
           { onConflict: "user_id,category_id,month,year" }
         );
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
+
+    // Recurring: pre-create the same budget for the next 11 months so it
+    // shows up automatically without needing a server-side cron job.
+    if (recurring) {
+      const targetCategoryId = budget?.category_id ?? categoryId;
+      const rows = monthsAhead(month, year, FORWARD_FILL_MONTHS).map(({ month: m, year: y }) => ({
+        user_id: userId, category_id: targetCategoryId, amount, month: m, year: y, recurring: true,
+      }));
+      await supabase.from("fin_budgets").upsert(rows, { onConflict: "user_id,category_id,month,year" });
+    }
+
+    setLoading(false);
     onSaved();
     onClose();
   }
@@ -111,6 +127,17 @@ export default function BudgetFormModal({
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Monthly Limit</label>
             <CurrencyInput value={amount} onChange={setAmount} className="input-field text-lg font-semibold" placeholder="0.00" />
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer">
+              <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)}
+                     className="w-4 h-4 accent-amber-500" />
+              Repeat this budget every month
+            </label>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Automatically sets the same limit for this category for the next 12 months.
+            </p>
           </div>
 
           {error && (
