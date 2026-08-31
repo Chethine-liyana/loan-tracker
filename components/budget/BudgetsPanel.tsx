@@ -121,7 +121,14 @@ export default function BudgetsPanel({ userId, budgets, categories, month, year,
                     {pace.pctSpent.toFixed(0)}%
                   </span>
                 </div>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                <p className={`text-[11px] mt-1 font-medium ${
+                  b.amount - b.spent >= 0 ? "text-gray-400 dark:text-gray-500" : "text-red-500 dark:text-red-400"
+                }`}>
+                  {b.amount - b.spent >= 0
+                    ? `${formatCurrency(b.amount - b.spent, currency)} remaining`
+                    : `${formatCurrency(b.spent - b.amount, currency)} over budget`}
+                </p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">
                   {pace.aheadOfPace ? "Spending faster than your day-of-month pace" : "On pace for the month"}
                 </p>
               </div>
