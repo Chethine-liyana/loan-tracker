@@ -16,8 +16,9 @@ interface Props {
 }
 
 const PRESETS: { value: RangePreset; label: string }[] = [
-  { value: "THIS_MONTH", label: "This Month" },
   { value: "LAST_MONTH", label: "Last Month" },
+  { value: "THIS_MONTH", label: "This Month" },
+  { value: "NEXT_MONTH", label: "Next Month" },
   { value: "THIS_YEAR", label: "This Year" },
   { value: "ALL_TIME", label: "All-Time" },
   { value: "CUSTOM", label: "Custom" },

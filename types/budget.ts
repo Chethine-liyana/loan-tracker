@@ -88,4 +88,4 @@ export interface DateRange {
   to: string;   // YYYY-MM-DD
 }
 
-export type RangePreset = "THIS_MONTH" | "LAST_MONTH" | "THIS_YEAR" | "ALL_TIME" | "CUSTOM";
+export type RangePreset = "LAST_MONTH" | "THIS_MONTH" | "NEXT_MONTH" | "THIS_YEAR" | "ALL_TIME" | "CUSTOM";

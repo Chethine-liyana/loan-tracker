@@ -120,6 +120,10 @@ export function rangeForPreset(preset: RangePreset, year: number, month: number)
       const d = subMonths(new Date(now.getFullYear(), now.getMonth(), 1), 1);
       return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
     }
+    case "NEXT_MONTH": {
+      const d = addMonths(new Date(now.getFullYear(), now.getMonth(), 1), 1);
+      return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
+    }
     case "THIS_YEAR": {
       const d = new Date(now.getFullYear(), 0, 1);
       return { from: ymd(startOfYear(d)), to: ymd(endOfYear(d)) };
