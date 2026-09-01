@@ -53,7 +53,9 @@ export default function WeeklySpendPanel({ allTransactions, rawBudgets, categori
 
   const totalBudget = budgetsThisMonth.reduce((s, b) => s + b.amount, 0);
   const totalSpent = weeks.reduce((s, w) => s + w.total, 0);
-  const remaining = Math.max(totalBudget - totalSpent, 0);
+  const remainingRaw = totalBudget - totalSpent;
+  const isOverBudget = totalBudget > 0 && remainingRaw < 0;
+  const remaining = Math.max(remainingRaw, 0);
   const perWeek = calcWeeklyAllowance(remaining, weeks.length);
 
   const chartData = weeks.map((w, i) => ({ label: w.label, total: w.total, index: i }));
@@ -72,17 +74,33 @@ export default function WeeklySpendPanel({ allTransactions, rawBudgets, categori
     <div ref={wrapperRef} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="stat-card sm:col-span-1">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Remaining This Month</p>
-          <p className="text-lg font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{formatCurrency(remaining, currency)}</p>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            {isOverBudget ? "Over Budget This Month" : "Remaining This Month"}
+          </p>
+          <p className={`text-lg font-bold mt-1 whitespace-nowrap ${
+            isOverBudget ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+          }`}>
+            {formatCurrency(isOverBudget ? Math.abs(remainingRaw) : remaining, currency)}
+          </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             {totalBudget > 0 ? `of ${formatCurrency(totalBudget, currency)} budgeted` : "No budget set yet"}
           </p>
         </div>
-        <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-indigo-700 dark:to-violet-800 p-5 text-white shadow-sm sm:col-span-2 flex items-center justify-between">
+        <div className={`rounded-2xl p-5 text-white shadow-sm sm:col-span-2 flex items-center justify-between ${
+          isOverBudget
+            ? "bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-700 dark:to-rose-800"
+            : "bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-indigo-700 dark:to-violet-800"
+        }`}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Left Per Week</p>
-            <p className="text-xl font-bold whitespace-nowrap">{formatCurrency(perWeek, currency)}</p>
-            <p className="text-xs opacity-70 mt-1">Remaining ÷ {weeks.length} weeks this month</p>
+            <p className="text-xl font-bold whitespace-nowrap">
+              {isOverBudget ? "Nothing left" : formatCurrency(perWeek, currency)}
+            </p>
+            <p className="text-xs opacity-70 mt-1">
+              {isOverBudget
+                ? "You've spent past this month's total budget"
+                : `Remaining ÷ ${weeks.length} weeks this month`}
+            </p>
           </div>
         </div>
       </div>
