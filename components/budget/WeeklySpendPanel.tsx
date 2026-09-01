@@ -6,13 +6,12 @@ import {
   PieChart, Pie,
 } from "recharts";
 import {
-  buildWeeklySpend, buildBudgetsWithSpend, calcWeeklyAllowance, formatCurrency,
+  buildWeeklySpend, calcWeeklyAllowance, formatCurrency,
 } from "@/lib/budget/calculations";
-import type { FinTransaction, FinCategory, FinBudget } from "@/types/budget";
+import type { FinTransaction, FinCategory } from "@/types/budget";
 
 interface Props {
   allTransactions: FinTransaction[];
-  rawBudgets: FinBudget[];
   categories: FinCategory[];
   currency: string;
 }
@@ -22,7 +21,7 @@ const PIE_COLORS_FALLBACK = ["#f59e0b", "#3b82f6", "#10b981", "#ef4444", "#8b5cf
 const BAR_COLOR = "#6366f1";
 const BAR_COLOR_ACTIVE = "#f97316";
 
-export default function WeeklySpendPanel({ allTransactions, rawBudgets, categories, currency }: Props) {
+export default function WeeklySpendPanel({ allTransactions, categories, currency }: Props) {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
@@ -46,17 +45,17 @@ export default function WeeklySpendPanel({ allTransactions, rawBudgets, categori
     [allTransactions, categories, month, year]
   );
 
-  const budgetsThisMonth = useMemo(
-    () => buildBudgetsWithSpend(rawBudgets, categories, allTransactions, month, year),
-    [rawBudgets, categories, allTransactions, month, year]
+  const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+  const transactionsThisMonth = useMemo(
+    () => allTransactions.filter((t) => t.date.startsWith(monthPrefix)),
+    [allTransactions, monthPrefix]
   );
 
-  const totalBudget = budgetsThisMonth.reduce((s, b) => s + b.amount, 0);
-  const totalSpent = weeks.reduce((s, w) => s + w.total, 0);
-  const remainingRaw = totalBudget - totalSpent;
-  const isOverBudget = totalBudget > 0 && remainingRaw < 0;
-  const remaining = Math.max(remainingRaw, 0);
-  const perWeek = calcWeeklyAllowance(remaining, weeks.length);
+  const income = transactionsThisMonth.filter((t) => t.kind === "INCOME").reduce((s, t) => s + t.amount, 0);
+  const expense = transactionsThisMonth.filter((t) => t.kind === "EXPENSE").reduce((s, t) => s + t.amount, 0);
+  const net = income - expense;
+  const isNegative = net < 0;
+  const perWeek = calcWeeklyAllowance(net, weeks.length);
 
   const chartData = weeks.map((w, i) => ({ label: w.label, total: w.total, index: i }));
   const activeWeek = selectedWeek !== null ? weeks[selectedWeek] : null;
@@ -75,32 +74,26 @@ export default function WeeklySpendPanel({ allTransactions, rawBudgets, categori
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="stat-card sm:col-span-1">
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {isOverBudget ? "Over Budget This Month" : "Remaining This Month"}
+            {isNegative ? "Net This Month (deficit)" : "Net This Month"}
           </p>
           <p className={`text-lg font-bold mt-1 whitespace-nowrap ${
-            isOverBudget ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+            isNegative ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
           }`}>
-            {formatCurrency(isOverBudget ? Math.abs(remainingRaw) : remaining, currency)}
+            {formatCurrency(net, currency)}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {totalBudget > 0 ? `of ${formatCurrency(totalBudget, currency)} budgeted` : "No budget set yet"}
+            {formatCurrency(income, currency)} in − {formatCurrency(expense, currency)} out
           </p>
         </div>
         <div className={`rounded-2xl p-5 text-white shadow-sm sm:col-span-2 flex items-center justify-between ${
-          isOverBudget
+          isNegative
             ? "bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-700 dark:to-rose-800"
             : "bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-indigo-700 dark:to-violet-800"
         }`}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Left Per Week</p>
-            <p className="text-xl font-bold whitespace-nowrap">
-              {isOverBudget ? "Nothing left" : formatCurrency(perWeek, currency)}
-            </p>
-            <p className="text-xs opacity-70 mt-1">
-              {isOverBudget
-                ? "You've spent past this month's total budget"
-                : `Remaining ÷ ${weeks.length} weeks this month`}
-            </p>
+            <p className="text-xl font-bold whitespace-nowrap">{formatCurrency(perWeek, currency)}</p>
+            <p className="text-xs opacity-70 mt-1">Net ÷ {weeks.length} weeks this month</p>
           </div>
         </div>
       </div>

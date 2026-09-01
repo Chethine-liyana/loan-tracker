@@ -205,7 +205,6 @@ export default function BudgetPage() {
           categories={categories}
           accounts={accountsWithBalance}
           budgets={budgetsWithSpend}
-          rawBudgets={rawBudgets}
           range={range}
           currency={currency}
         />
