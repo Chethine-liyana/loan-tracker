@@ -7,6 +7,7 @@ import { CURRENCY_CODES, nextOccurrence, toCSV, downloadFile } from "@/lib/budge
 import { getIcon } from "@/lib/budget/icons";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import RecurringFormModal from "@/components/budget/RecurringFormModal";
+import ImportCsvModal from "@/components/budget/ImportCsvModal";
 import type { FinCategory, FinRecurring, FinAccount, FinTransaction } from "@/types/budget";
 
 interface Props {
@@ -28,6 +29,7 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
   const [editingRecurring, setEditingRecurring] = useState<FinRecurring | null>(null);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [runningRecurring, setRunningRecurring] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
@@ -193,10 +195,13 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
         </div>
       </div>
 
-      {/* ── Export ── */}
+      {/* ── Import / Export ── */}
       <div className="stat-card">
         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">Backup</p>
-        <button onClick={exportAll} className="btn-secondary text-sm">Export all transactions (CSV)</button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowImport(true)} className="btn-secondary text-sm">Import transactions (CSV)</button>
+          <button onClick={exportAll} className="btn-secondary text-sm">Export all transactions (CSV)</button>
+        </div>
       </div>
 
       {(addingCategory || editingCategory) && (
@@ -217,6 +222,16 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
           recurring={editingRecurring ?? undefined}
           onClose={() => { setAddingRecurring(false); setEditingRecurring(null); }}
           onSaved={onChanged}
+        />
+      )}
+      {showImport && (
+        <ImportCsvModal
+          userId={userId}
+          accounts={accounts}
+          categories={categories}
+          allTransactions={allTransactions}
+          onClose={() => setShowImport(false)}
+          onImported={onChanged}
         />
       )}
     </div>
