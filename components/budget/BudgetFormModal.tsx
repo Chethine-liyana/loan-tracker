@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
-import { monthsAhead } from "@/lib/budget/calculations";
+import { monthsAhead, sortCategoriesHierarchically } from "@/lib/budget/calculations";
 import { Plus } from "lucide-react";
 import type { FinCategory, FinBudget } from "@/types/budget";
 
@@ -36,9 +36,9 @@ export default function BudgetFormModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const availableCategories = budget
-    ? expenseCategories
-    : expenseCategories.filter((c) => !existingBudgetCategoryIds.includes(c.id));
+  const availableCategories = sortCategoriesHierarchically(
+    budget ? expenseCategories : expenseCategories.filter((c) => !existingBudgetCategoryIds.includes(c.id))
+  );
 
   function handleCategoryCreated(cat: FinCategory) {
     setLocalCategories((prev) => [...prev, cat]);
@@ -108,7 +108,10 @@ export default function BudgetFormModal({
                       style={active ? { backgroundColor: c.color } : undefined}
                     >
                       <Icon size={16} />
-                      <span className="truncate w-full text-center px-0.5">{c.name}</span>
+                      <span className="truncate w-full text-center px-0.5">
+                        {c.parent_id && <span className="opacity-60">↳ </span>}
+                        {c.name}
+                      </span>
                     </button>
                   );
                 })}
@@ -156,6 +159,7 @@ export default function BudgetFormModal({
       {showNewCategory && (
         <CategoryFormModal
           userId={userId}
+          categories={localCategories}
           defaultKind="EXPENSE"
           lockKind
           onClose={() => setShowNewCategory(false)}

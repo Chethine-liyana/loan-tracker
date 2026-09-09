@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
+import { sortCategoriesHierarchically } from "@/lib/budget/calculations";
 import type { FinAccount, FinCategory, FinRecurring, RecurrenceFrequency } from "@/types/budget";
 
 interface Props {
@@ -35,7 +36,7 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
   const [showNewCategory, setShowNewCategory] = useState(false);
 
   const filteredCategories = useMemo(
-    () => localCategories.filter((c) => c.kind === kind && !c.archived),
+    () => sortCategoriesHierarchically(localCategories.filter((c) => c.kind === kind && !c.archived)),
     [localCategories, kind]
   );
 
@@ -106,7 +107,9 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
               <div className="flex gap-1.5">
                 <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field">
                   <option value="">Select…</option>
-                  {filteredCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {filteredCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.parent_id ? `↳ ${c.name}` : c.name}</option>
+                  ))}
                 </select>
                 <button type="button" onClick={() => setShowNewCategory(true)} className="btn-secondary px-2.5" title="New category">+</button>
               </div>
@@ -164,6 +167,7 @@ export default function RecurringFormModal({ userId, accounts, categories, recur
       {showNewCategory && (
         <CategoryFormModal
           userId={userId}
+          categories={localCategories}
           defaultKind={kind}
           lockKind
           onClose={() => setShowNewCategory(false)}

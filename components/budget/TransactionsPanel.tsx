@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, toCSV, downloadFile } from "@/lib/budget/calculations";
+import { formatCurrency, toCSV, downloadFile, sortCategoriesHierarchically } from "@/lib/budget/calculations";
 import { getIcon } from "@/lib/budget/icons";
 import TransactionFormModal from "@/components/budget/TransactionFormModal";
 import type { FinTransaction, FinCategory, FinAccount } from "@/types/budget";
@@ -74,7 +74,9 @@ export default function TransactionsPanel({ userId, transactions, accounts, cate
         </select>
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="input-field py-1.5 text-sm w-auto">
           <option value="ALL">All categories</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {sortCategoriesHierarchically(categories).map((c) => (
+            <option key={c.id} value={c.id}>{c.parent_id ? `↳ ${c.name}` : c.name}</option>
+          ))}
         </select>
         <button onClick={exportCSV} className="btn-secondary text-xs px-2.5 py-1.5">CSV</button>
         <button onClick={exportJSON} className="btn-secondary text-xs px-2.5 py-1.5">JSON</button>

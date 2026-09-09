@@ -29,6 +29,7 @@ export interface FinCategory {
   color: string;
   kind: CategoryKind;
   archived: boolean;
+  parent_id: string | null;
   created_at: string;
 }
 

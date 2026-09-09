@@ -97,6 +97,22 @@ export function computeAccountBalances(
   return accounts.map((a) => ({ ...a, balance: balances.get(a.id) ?? a.starting_balance }));
 }
 
+// ── Category hierarchy ───────────────────────────────────────────
+/** Orders categories so each parent is immediately followed by its own subcategories. */
+export function sortCategoriesHierarchically(categories: FinCategory[]): FinCategory[] {
+  const ids = new Set(categories.map((c) => c.id));
+  // A category counts as top-level here if it has no parent, OR its parent
+  // isn't in this list (e.g. the parent got archived/filtered out elsewhere)
+  // — otherwise it would silently vanish instead of falling back to flat.
+  const topLevel = categories.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+  const out: FinCategory[] = [];
+  for (const parent of topLevel) {
+    out.push(parent);
+    out.push(...categories.filter((c) => c.parent_id === parent.id && ids.has(c.parent_id!)));
+  }
+  return out;
+}
+
 // ── Recurring transactions ───────────────────────────────────────
 export function nextOccurrence(date: Date, frequency: RecurrenceFrequency): Date {
   switch (frequency) {

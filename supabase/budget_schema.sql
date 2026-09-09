@@ -35,8 +35,13 @@ CREATE TABLE IF NOT EXISTS public.fin_categories (
   color      TEXT NOT NULL DEFAULT '#6366f1',
   kind       TEXT NOT NULL CHECK (kind IN ('INCOME', 'EXPENSE')),
   archived   BOOLEAN NOT NULL DEFAULT FALSE,
+  parent_id  UUID REFERENCES public.fin_categories(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade (safe to re-run): add subcategory support if this table already existed
+ALTER TABLE public.fin_categories ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES public.fin_categories(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS fin_categories_parent_idx ON public.fin_categories (parent_id);
 
 -- ── Transactions (expense / income / transfer) ───────────────────
 CREATE TABLE IF NOT EXISTS public.fin_transactions (

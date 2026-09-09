@@ -128,33 +128,54 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Categories</p>
         </div>
-        {(["EXPENSE", "INCOME"] as const).map((kind) => (
-          <div key={kind} className="mb-4 last:mb-0">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-400">{kind === "EXPENSE" ? "Expense" : "Income"}</p>
-              <button onClick={() => setAddingCategory(kind)} className="btn-ghost text-xs">+ Add</button>
+        {(["EXPENSE", "INCOME"] as const).map((kind) => {
+          const cats = kind === "EXPENSE" ? expenseCats : incomeCats;
+          const topLevel = cats.filter((c) => !c.parent_id);
+          const childrenOf = (parentId: string) => cats.filter((c) => c.parent_id === parentId);
+
+          const Chip = ({ c }: { c: FinCategory }) => {
+            const Icon = getIcon(c.icon);
+            return (
+              <button
+                onClick={() => setEditingCategory(c)}
+                className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-xs font-medium transition-opacity ${
+                  c.archived ? "opacity-40 border-gray-200 dark:border-gray-700" : "border-gray-200 dark:border-gray-700"
+                }`}
+              >
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: c.color }}>
+                  <Icon size={11} />
+                </span>
+                <span className="text-gray-700 dark:text-gray-200">{c.name}</span>
+              </button>
+            );
+          };
+
+          return (
+            <div key={kind} className="mb-4 last:mb-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-400">{kind === "EXPENSE" ? "Expense" : "Income"}</p>
+                <button onClick={() => setAddingCategory(kind)} className="btn-ghost text-xs">+ Add</button>
+              </div>
+              <div className="space-y-2">
+                {topLevel.map((parent) => {
+                  const children = childrenOf(parent.id);
+                  return (
+                    <div key={parent.id}>
+                      <div className="flex flex-wrap gap-2">
+                        <Chip c={parent} />
+                      </div>
+                      {children.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-1.5 ml-4 pl-3 border-l-2 border-gray-100 dark:border-gray-700">
+                          {children.map((child) => <Chip key={child.id} c={child} />)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {(kind === "EXPENSE" ? expenseCats : incomeCats).map((c) => {
-                const Icon = getIcon(c.icon);
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setEditingCategory(c)}
-                    className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-xs font-medium transition-opacity ${
-                      c.archived ? "opacity-40 border-gray-200 dark:border-gray-700" : "border-gray-200 dark:border-gray-700"
-                    }`}
-                  >
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: c.color }}>
-                      <Icon size={11} />
-                    </span>
-                    <span className="text-gray-700 dark:text-gray-200">{c.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Recurring transactions ── */}
@@ -207,6 +228,7 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
       {(addingCategory || editingCategory) && (
         <CategoryFormModal
           userId={userId}
+          categories={categories}
           category={editingCategory ?? undefined}
           defaultKind={addingCategory ?? "EXPENSE"}
           onClose={() => { setAddingCategory(null); setEditingCategory(null); }}

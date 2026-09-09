@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
+import { sortCategoriesHierarchically } from "@/lib/budget/calculations";
 import { Plus } from "lucide-react";
 import type { FinAccount, FinCategory, FinTransaction, TransactionKind, RecurrenceFrequency } from "@/types/budget";
 
@@ -50,7 +51,7 @@ export default function TransactionFormModal({
   const [showNewCategory, setShowNewCategory] = useState(false);
 
   const filteredCategories = useMemo(
-    () => localCategories.filter((c) => c.kind === kind && !c.archived),
+    () => sortCategoriesHierarchically(localCategories.filter((c) => c.kind === kind && !c.archived)),
     [localCategories, kind]
   );
 
@@ -196,7 +197,10 @@ export default function TransactionFormModal({
                       style={active ? { backgroundColor: c.color } : undefined}
                     >
                       <Icon size={16} />
-                      <span className="truncate w-full text-center px-0.5">{c.name}</span>
+                      <span className="truncate w-full text-center px-0.5">
+                        {c.parent_id && <span className="opacity-60">↳ </span>}
+                        {c.name}
+                      </span>
                     </button>
                   );
                 })}
@@ -263,6 +267,7 @@ export default function TransactionFormModal({
       {showNewCategory && (
         <CategoryFormModal
           userId={userId}
+          categories={localCategories}
           defaultKind={kind === "TRANSFER" ? "EXPENSE" : kind}
           lockKind
           onClose={() => setShowNewCategory(false)}

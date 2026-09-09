@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import IconColorPicker from "@/components/budget/IconColorPicker";
 import type { FinCategory, CategoryKind } from "@/types/budget";
 
 interface Props {
   userId: string;
+  categories: FinCategory[]; // used to populate the parent-category picker
   category?: FinCategory;
   defaultKind?: CategoryKind;
   lockKind?: boolean;
@@ -16,23 +17,46 @@ interface Props {
 }
 
 export default function CategoryFormModal({
-  userId, category, defaultKind = "EXPENSE", lockKind = false, onClose, onSaved, onArchiveToggle,
+  userId, categories, category, defaultKind = "EXPENSE", lockKind = false, onClose, onSaved, onArchiveToggle,
 }: Props) {
   const [name, setName] = useState(category?.name ?? "");
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? defaultKind);
   const [icon, setIcon] = useState(category?.icon ?? "shapes");
   const [color, setColor] = useState(category?.color ?? "#6366f1");
+  const [isSubcategory, setIsSubcategory] = useState(!!category?.parent_id);
+  const [parentId, setParentId] = useState(category?.parent_id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Only top-level categories of the same kind can be a parent, and a
+  // category can't become its own (grand)parent.
+  const eligibleParents = categories.filter(
+    (c) => c.kind === kind && !c.archived && !c.parent_id && c.id !== category?.id
+  );
+
+  function handleSubcategoryToggle(checked: boolean) {
+    setIsSubcategory(checked);
+    if (!checked) setParentId("");
+    else if (!parentId) setParentId(eligibleParents[0]?.id ?? "");
+  }
+
+  // If the kind changes, the previously-picked parent may no longer be valid.
+  useEffect(() => {
+    if (isSubcategory && !eligibleParents.some((c) => c.id === parentId)) {
+      setParentId(eligibleParents[0]?.id ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!name.trim()) { setError("Name is required."); return; }
+    if (isSubcategory && !parentId) { setError("Choose a parent category."); return; }
 
     setLoading(true);
     const supabase = createClient();
-    const payload = { name: name.trim(), kind, icon, color };
+    const payload = { name: name.trim(), kind, icon, color, parent_id: isSubcategory ? parentId : null };
 
     const { data, error: dbError } = category
       ? await supabase.from("fin_categories").update(payload).eq("id", category.id).select().single()
@@ -75,6 +99,31 @@ export default function CategoryFormModal({
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" placeholder="e.g. Groceries" />
           </div>
+
+          {eligibleParents.length > 0 && (
+            <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isSubcategory}
+                  onChange={(e) => handleSubcategoryToggle(e.target.checked)}
+                  className="w-4 h-4 accent-amber-500"
+                />
+                This is a subcategory
+              </label>
+              {isSubcategory && (
+                <select
+                  value={parentId}
+                  onChange={(e) => setParentId(e.target.value)}
+                  className="input-field mt-2"
+                >
+                  {eligibleParents.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <IconColorPicker icon={icon} color={color} onIconChange={setIcon} onColorChange={setColor} />
 
