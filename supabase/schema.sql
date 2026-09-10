@@ -28,6 +28,10 @@ ALTER TABLE public.loans
   ADD COLUMN IF NOT EXISTS loan_type TEXT NOT NULL DEFAULT 'GOLD_PAWN'
     CHECK (loan_type IN ('GOLD_PAWN', 'HOUSING'));
 
+-- Renewal / auction deadline (gold pawn tickets usually have a fixed
+-- redemption period — this is the date it must be renewed or paid off by).
+ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS renewal_date DATE;
+
 -- pawn_date is no longer required; make it nullable if it exists
 DO $$
 BEGIN

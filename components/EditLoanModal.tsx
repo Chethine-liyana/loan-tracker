@@ -25,6 +25,8 @@ interface EditForm {
   monthly_emi: number;
   loan_tenure_months: number;
   property_collateral: string;
+  // Gold-pawn-specific
+  renewal_date: string;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -50,6 +52,7 @@ export default function EditLoanModal({ loan, onClose, onSaved }: Props) {
     monthly_emi:                 loan.monthly_emi ?? 0,
     loan_tenure_months:          loan.loan_tenure_months ?? 0,
     property_collateral:         loan.property_collateral ?? "",
+    renewal_date:                loan.renewal_date ? toDateInput(loan.renewal_date) : "",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +119,8 @@ export default function EditLoanModal({ loan, onClose, onSaved }: Props) {
         monthly_emi:          isHousing ? (form.monthly_emi || null) : null,
         loan_tenure_months:   isHousing ? (form.loan_tenure_months || null) : null,
         property_collateral:  isHousing ? (form.property_collateral.trim() || null) : null,
+        // Gold-pawn-specific
+        renewal_date:         !isHousing ? (form.renewal_date || null) : null,
       })
       .eq("id", loan.id);
 
@@ -312,6 +317,26 @@ export default function EditLoanModal({ loan, onClose, onSaved }: Props) {
               </p>
             </div>
           </div>
+
+          {/* ── Gold-pawn-only: renewal / auction deadline ── */}
+          {!isHousing && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Renewal / Auction Date{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="date"
+                name="renewal_date"
+                value={form.renewal_date}
+                onChange={setText}
+                className="input-field"
+              />
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                When the ticket must be renewed or paid off by.
+              </p>
+            </div>
+          )}
 
           {/* ── Housing-specific fields ── */}
           {isHousing && (

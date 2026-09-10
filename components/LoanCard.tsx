@@ -10,6 +10,8 @@ import {
   dailyCost,
   formatLKR,
   formatRs,
+  daysUntil,
+  renewalUrgency,
 } from "@/lib/calculations";
 import PaymentModal from "@/components/PaymentModal";
 import EditLoanModal from "@/components/EditLoanModal";
@@ -53,6 +55,10 @@ export default function LoanCard({ loan, onUpdated }: Props) {
   const repaidPct   = loan.initial_amount > 0
     ? Math.min(((loan.initial_amount - loan.current_principal_remaining) / loan.initial_amount) * 100, 100)
     : 0;
+
+  // ── Gold-pawn renewal / auction deadline ──────────────────
+  const renewalDays = loan.renewal_date ? daysUntil(loan.renewal_date) : null;
+  const urgency = renewalDays !== null ? renewalUrgency(renewalDays) : null;
 
   // ── Housing-specific calculations ─────────────────────────
   const isHousing = loan.loan_type === "HOUSING";
@@ -112,6 +118,18 @@ export default function LoanCard({ loan, onUpdated }: Props) {
               <span className="text-amber-600 dark:text-amber-400 font-medium">{loan.annual_interest_rate}% p.a.</span>
               {" · "}Last paid {format(new Date(loan.last_payment_date), "dd MMM yyyy")}
             </p>
+            {renewalDays !== null && (
+              <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${
+                urgency === "overdue" ? "text-red-600 dark:text-red-400"
+                : urgency === "due-soon" ? "text-orange-600 dark:text-orange-400"
+                : "text-gray-400 dark:text-gray-500"
+              }`}>
+                {urgency !== "ok" && <span>⚠️</span>}
+                {urgency === "overdue"
+                  ? `Renewal overdue by ${Math.abs(renewalDays)}d`
+                  : `Renews in ${renewalDays}d · ${format(new Date(loan.renewal_date!), "dd MMM yyyy")}`}
+              </p>
+            )}
           </div>
 
           <div className="text-right shrink-0">

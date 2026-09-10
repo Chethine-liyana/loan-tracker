@@ -38,6 +38,7 @@ const EMPTY_FORM = (type: LoanType): NewLoanPayload => ({
   monthly_emi: 0,
   loan_tenure_months: 0,
   property_collateral: "",
+  renewal_date: "",
 });
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -117,6 +118,8 @@ export default function AddLoanModal({ defaultType = "GOLD_PAWN", onClose, onAdd
       monthly_emi:          isHousing && form.monthly_emi ? form.monthly_emi : null,
       loan_tenure_months:   isHousing && form.loan_tenure_months ? form.loan_tenure_months : null,
       property_collateral:  isHousing && form.property_collateral?.trim() ? form.property_collateral.trim() : null,
+      // Gold-pawn-specific
+      renewal_date:         !isHousing && form.renewal_date ? form.renewal_date : null,
     });
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
@@ -301,6 +304,21 @@ export default function AddLoanModal({ defaultType = "GOLD_PAWN", onClose, onAdd
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Blank = use start date</p>
             </div>
           </div>
+
+          {/* ── Gold-pawn-only: renewal / auction deadline ── */}
+          {!isHousing && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Renewal / Auction Date{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input type="date" name="renewal_date" value={form.renewal_date ?? ""}
+                     onChange={setText} className="input-field" />
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                When the ticket must be renewed or paid off by — you&apos;ll get a warning as it approaches.
+              </p>
+            </div>
+          )}
 
           {/* ── Housing-only fields ── */}
           {isHousing && (

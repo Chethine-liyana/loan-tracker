@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatLKR, calcAccruedInterest, dailyCost } from "@/lib/calculations";
+import { formatLKR, calcAccruedInterest, dailyCost, daysUntil, renewalUrgency } from "@/lib/calculations";
+import { format } from "date-fns";
 import LoanCard from "@/components/LoanCard";
 import AddLoanModal from "@/components/AddLoanModal";
 import PaymentPlanner from "@/components/PaymentPlanner";
@@ -112,6 +113,49 @@ function CategoryStrip({
   );
 }
 
+// ── Pawn renewal / auction deadline alerts ───────────────────
+function RenewalAlertsBanner({ loans }: { loans: Loan[] }) {
+  const alerts = loans
+    .filter((l) => l.loan_type === "GOLD_PAWN" && l.renewal_date)
+    .map((l) => ({ loan: l, daysLeft: daysUntil(l.renewal_date!) }))
+    .filter(({ daysLeft }) => renewalUrgency(daysLeft) !== "ok")
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <section className="mb-6 rounded-2xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-900/10 p-4">
+      <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-widest mb-3">
+        ⚠️ Renewal / Auction Alerts
+      </p>
+      <div className="space-y-2">
+        {alerts.map(({ loan, daysLeft }) => {
+          const overdue = daysLeft <= 0;
+          return (
+            <div key={loan.id} className="flex items-center justify-between gap-3 bg-white/70 dark:bg-gray-800/50 rounded-xl px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {loan.bank_name}{loan.ticket_no ? ` · #${loan.ticket_no}` : ""}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {format(new Date(loan.renewal_date!), "dd MMM yyyy")}
+                </p>
+              </div>
+              <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ${
+                overdue
+                  ? "bg-red-600 text-white"
+                  : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+              }`}>
+                {overdue ? `Overdue ${Math.abs(daysLeft)}d` : `${daysLeft}d left`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ── Main dashboard ───────────────────────────────────────────
 export default function DashboardPage() {
   const [loans,     setLoans]     = useState<Loan[]>([]);
@@ -157,6 +201,8 @@ export default function DashboardPage() {
           <span className="hidden sm:inline">Add Account</span>
         </button>
       </div>
+
+      <RenewalAlertsBanner loans={loans} />
 
       {loans.length > 0 && (
         <>

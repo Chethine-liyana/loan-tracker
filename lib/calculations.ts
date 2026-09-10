@@ -25,6 +25,23 @@ export function daysElapsed(lastPaymentDate: Date | string): number {
 }
 
 /**
+ * Days from today until `date` — negative when the date is in the past
+ * (e.g. an overdue pawn renewal / auction deadline).
+ */
+export function daysUntil(date: Date | string): number {
+  return differenceInDays(new Date(date), new Date());
+}
+
+export type RenewalUrgency = "ok" | "due-soon" | "overdue";
+
+/** <=0 days left = overdue; <=14 days = due soon; otherwise ok. */
+export function renewalUrgency(daysLeft: number): RenewalUrgency {
+  if (daysLeft <= 0) return "overdue";
+  if (daysLeft <= 14) return "due-soon";
+  return "ok";
+}
+
+/**
  * Process a payment against a loan.
  *
  * Order of operations (per spec):

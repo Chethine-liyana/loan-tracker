@@ -19,6 +19,9 @@ export interface Loan {
   monthly_emi?: number | null;          // fixed monthly EMI amount
   loan_tenure_months?: number | null;   // total tenure in months (e.g. 84, 120, 240)
   property_collateral?: string | null;  // property description / collateral location
+
+  // Gold-pawn-specific (nullable for HOUSING)
+  renewal_date?: string | null;  // ticket must be renewed / paid off by this date, or risks auction
 }
 
 export interface NewLoanPayload {
@@ -37,6 +40,9 @@ export interface NewLoanPayload {
   monthly_emi?: number;
   loan_tenure_months?: number;
   property_collateral?: string;
+
+  // Gold-pawn-specific
+  renewal_date?: string;
 }
 
 export interface PaymentResult {
