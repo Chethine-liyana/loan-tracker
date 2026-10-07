@@ -8,7 +8,8 @@ import LoanCard from "@/components/LoanCard";
 import AddLoanModal from "@/components/AddLoanModal";
 import PaymentPlanner from "@/components/PaymentPlanner";
 import PortfolioCharts from "@/components/PortfolioCharts";
-import type { Loan, LoanType, CategoryStats, DashboardStats } from "@/types";
+import InterestTrendChart from "@/components/InterestTrendChart";
+import type { Loan, LoanType, LoanSnapshot, CategoryStats, DashboardStats } from "@/types";
 
 type Tab = "GOLD_PAWN" | "HOUSING";
 
@@ -159,6 +160,7 @@ function RenewalAlertsBanner({ loans }: { loans: Loan[] }) {
 // ── Main dashboard ───────────────────────────────────────────
 export default function DashboardPage() {
   const [loans,     setLoans]     = useState<Loan[]>([]);
+  const [snapshots, setSnapshots] = useState<LoanSnapshot[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("GOLD_PAWN");
   const [showAdd,   setShowAdd]   = useState(false);
@@ -166,11 +168,13 @@ export default function DashboardPage() {
 
   const fetchLoans = useCallback(async () => {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("loans")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const [{ data, error }, snapRes] = await Promise.all([
+      supabase.from("loans").select("*").order("created_at", { ascending: false }),
+      supabase.from("loan_snapshots").select("*").order("recorded_at", { ascending: true }),
+    ]);
     if (!error && data) setLoans(data as Loan[]);
+    // If the history table hasn't been created yet this is just empty and the chart falls back to start/last-payment dates.
+    setSnapshots(!snapRes.error && snapRes.data ? (snapRes.data as LoanSnapshot[]) : []);
     setLoading(false);
   }, []);
 
@@ -286,6 +290,15 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* ── Interest over time (scoped to the active tab) ── */}
+      {visibleLoans.length > 0 && (
+        <InterestTrendChart
+          loans={visibleLoans}
+          snapshots={snapshots}
+          title={`${TAB_META[activeTab].emoji} Interest Over Time`}
+        />
+      )}
 
       {/* ── Charts (scoped to the active tab, gold pawn and housing kept separate) ── */}
       <PortfolioCharts

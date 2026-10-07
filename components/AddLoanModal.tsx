@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
+import { recordSnapshot } from "@/lib/snapshots";
 import { reverseCalcRate } from "@/lib/calculations";
 import type { LoanType, NewLoanPayload } from "@/types";
 
@@ -100,7 +101,7 @@ export default function AddLoanModal({ defaultType = "GOLD_PAWN", onClose, onAdd
 
     const isHousing = form.loan_type === "HOUSING";
 
-    const { error: dbError } = await supabase.from("loans").insert({
+    const { data: created, error: dbError } = await supabase.from("loans").insert({
       user_id:                        user.id,
       bank_name:                      form.bank_name.trim(),
       branch:                         form.branch.trim(),
@@ -120,9 +121,24 @@ export default function AddLoanModal({ defaultType = "GOLD_PAWN", onClose, onAdd
       property_collateral:  isHousing && form.property_collateral?.trim() ? form.property_collateral.trim() : null,
       // Gold-pawn-specific
       renewal_date:         !isHousing && form.renewal_date ? form.renewal_date : null,
-    });
+    }).select("id").single();
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
+
+    if (created) {
+      const startDay = form.start_date.slice(0, 10);
+      const currentDay = (form.last_payment_date || form.start_date).slice(0, 10);
+      if (form.initial_amount > 0 && startDay < currentDay) {
+        await recordSnapshot(supabase, {
+          userId: user.id, loanId: created.id, principal: form.initial_amount,
+          rate: form.annual_interest_rate, event: "BASELINE", date: startDay,
+        });
+      }
+      await recordSnapshot(supabase, {
+        userId: user.id, loanId: created.id, principal: form.current_principal_remaining,
+        rate: form.annual_interest_rate, event: "BASELINE", date: currentDay,
+      });
+    }
     onAdded();
     onClose();
   }

@@ -9,6 +9,7 @@ import {
   daysElapsed,
 } from "@/lib/calculations";
 import CurrencyInput from "@/components/CurrencyInput";
+import { recordSnapshot } from "@/lib/snapshots";
 import type { Loan } from "@/types";
 
 interface Props {
@@ -66,6 +67,10 @@ export default function PaymentModal({ loan, onClose, onPaid }: Props) {
       .eq("id", loan.id);
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
+    await recordSnapshot(supabase, {
+      userId: loan.user_id, loanId: loan.id, principal: result.new_principal,
+      rate: loan.annual_interest_rate, event: "PAYMENT",
+    });
     onPaid();
     onClose();
   }

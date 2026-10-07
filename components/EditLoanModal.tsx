@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import CurrencyInput from "@/components/CurrencyInput";
+import { recordSnapshot } from "@/lib/snapshots";
 import { reverseCalcRate } from "@/lib/calculations";
 import type { Loan } from "@/types";
 
@@ -125,6 +126,15 @@ export default function EditLoanModal({ loan, onClose, onSaved }: Props) {
       .eq("id", loan.id);
 
     if (dbError) { setError(dbError.message); setLoading(false); return; }
+    if (
+      form.current_principal_remaining !== loan.current_principal_remaining ||
+      form.annual_interest_rate !== loan.annual_interest_rate
+    ) {
+      await recordSnapshot(supabase, {
+        userId: loan.user_id, loanId: loan.id, principal: form.current_principal_remaining,
+        rate: form.annual_interest_rate, event: "ADJUSTMENT",
+      });
+    }
     onSaved();
     onClose();
   }

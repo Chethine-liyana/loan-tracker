@@ -99,3 +99,15 @@ export interface AllocationPlan {
   totalAssigned: number;
   leftover: number; // couldn't be usefully allocated (would overpay every selected loan)
 }
+
+// ── Point-in-time record of a loan's principal + rate (drives the interest trend chart) ──
+export interface LoanSnapshot {
+  id: string;
+  user_id: string;
+  loan_id: string;
+  recorded_at: string; // YYYY-MM-DD
+  principal: number;
+  annual_rate: number;
+  event: 'BASELINE' | 'PAYMENT' | 'ADJUSTMENT';
+  created_at: string;
+}

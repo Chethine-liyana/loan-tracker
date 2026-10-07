@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { recommendAllocation, formatLKR } from "@/lib/calculations";
 import CurrencyInput from "@/components/CurrencyInput";
+import { recordSnapshot } from "@/lib/snapshots";
 import type { Loan, PawnAccountInput } from "@/types";
 
 interface Props {
@@ -75,6 +76,11 @@ export default function PaymentPlanner({ loans, onClose, onApplied }: Props) {
         setApplying(false);
         return;
       }
+      const loan = loanFor(item.loanId);
+      await recordSnapshot(supabase, {
+        userId: loan.user_id, loanId: loan.id, principal: item.newPrincipal,
+        rate: loan.annual_interest_rate, event: "PAYMENT",
+      });
     }
 
     setApplying(false);
