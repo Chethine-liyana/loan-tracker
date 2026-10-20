@@ -6,6 +6,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { buildCategoryTrend, buildSavingsRate, formatCurrency } from "@/lib/budget/calculations";
+import { usePeriodStart } from "@/lib/budget/PeriodContext";
 import type { FinTransaction, FinCategory } from "@/types/budget";
 
 interface Props {
@@ -22,11 +23,12 @@ function shortK(n: number): string {
 }
 
 export default function TrendCharts({ allTransactions, categories, currency }: Props) {
+  const startDay = usePeriodStart();
   const [months, setMonths] = useState<6 | 12>(6);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  const trend = useMemo(() => buildCategoryTrend(allTransactions, categories, months), [allTransactions, categories, months]);
-  const savings = useMemo(() => buildSavingsRate(allTransactions, months), [allTransactions, months]);
+  const trend = useMemo(() => buildCategoryTrend(allTransactions, categories, months, 6, startDay), [allTransactions, categories, months, startDay]);
+  const savings = useMemo(() => buildSavingsRate(allTransactions, months, startDay), [allTransactions, months, startDay]);
 
   const visible = trend.series.filter((s) => !hidden.has(s.id));
   const rated = savings.filter((p) => p.rate !== null);

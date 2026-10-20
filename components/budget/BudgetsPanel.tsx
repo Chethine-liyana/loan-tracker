@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calcBudgetPace, formatCurrency } from "@/lib/budget/calculations";
+import { periodSpanText } from "@/lib/budget/period";
+import { usePeriodStart } from "@/lib/budget/PeriodContext";
 import { getIcon } from "@/lib/budget/icons";
 import BudgetFormModal from "@/components/budget/BudgetFormModal";
 import type { FinCategory, FinTransaction, BudgetWithSpend } from "@/types/budget";
@@ -26,6 +28,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function BudgetsPanel({ userId, budgets, categories, month, year, currency, onChanged, onMonthYearChange }: Props) {
+  const startDay = usePeriodStart();
   const [editing, setEditing] = useState<BudgetWithSpend | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -58,6 +61,9 @@ export default function BudgetsPanel({ userId, budgets, categories, month, year,
           <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {new Date(year, month - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}
+              {periodSpanText(month, year, startDay) && (
+                <span className="text-gray-400 dark:text-gray-500"> · {periodSpanText(month, year, startDay)}</span>
+              )}
             </p>
             {totalBudget > 0 && (
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
@@ -77,7 +83,7 @@ export default function BudgetsPanel({ userId, budgets, categories, month, year,
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {budgets.map((b) => {
-            const pace = calcBudgetPace(b.spent, b.amount, month, year);
+            const pace = calcBudgetPace(b.spent, b.amount, month, year, startDay);
             const Icon = getIcon(b.category.icon);
             const barWidth = Math.min(pace.pctSpent, 100);
             return (

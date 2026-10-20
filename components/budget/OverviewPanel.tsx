@@ -11,6 +11,7 @@ import {
 } from "@/lib/budget/calculations";
 import { getIcon } from "@/lib/budget/icons";
 import SummaryCardExport from "@/components/budget/SummaryCardExport";
+import { usePeriodStart } from "@/lib/budget/PeriodContext";
 import WeeklySpendPanel from "@/components/budget/WeeklySpendPanel";
 import TrendCharts from "@/components/budget/TrendCharts";
 import type { FinTransaction, FinCategory, FinAccount, DateRange, FinBudget } from "@/types/budget";
@@ -30,14 +31,15 @@ const PIE_COLORS_FALLBACK = ["#f59e0b", "#3b82f6", "#10b981", "#ef4444", "#8b5cf
 export default function OverviewPanel({
   transactions, allTransactions, categories, accounts, budgets, range, currency,
 }: Props) {
+  const startDay = usePeriodStart();
   const trend = buildSpendTrend(transactions, range);
   const breakdown = buildCategoryBreakdown(transactions, categories, "EXPENSE");
-  const inflowOutflow = buildMonthlyInflowOutflow(allTransactions, 6);
+  const inflowOutflow = buildMonthlyInflowOutflow(allTransactions, 6, startDay);
 
   const income = transactions.filter((t) => t.kind === "INCOME").reduce((s, t) => s + t.amount, 0);
   const expense = transactions.filter((t) => t.kind === "EXPENSE").reduce((s, t) => s + t.amount, 0);
   const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
-  const safeToSpend = calcSafeToSpend(totalBudget, expense);
+  const safeToSpend = calcSafeToSpend(totalBudget, expense, startDay);
 
   const recent = [...allTransactions]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.created_at.localeCompare(a.created_at)))
@@ -78,7 +80,7 @@ export default function OverviewPanel({
           <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 dark:from-emerald-700 dark:to-teal-800 p-5 text-white shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Safe to Spend / Day</p>
             <p className="text-base sm:text-lg font-bold whitespace-nowrap">{formatCurrency(safeToSpend.perDay, currency)}</p>
-            <p className="text-xs opacity-70 mt-1">{safeToSpend.daysLeft} days left this month</p>
+            <p className="text-xs opacity-70 mt-1">{safeToSpend.daysLeft} days left this {startDay > 1 ? "period" : "month"}</p>
           </div>
         ) : (
           <div className="stat-card justify-center">

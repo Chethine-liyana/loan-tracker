@@ -13,6 +13,7 @@ import type { FinCategory, FinRecurring, FinAccount, FinTransaction } from "@/ty
 interface Props {
   userId: string;
   currency: string;
+  startDay: number;
   categories: FinCategory[];
   recurring: FinRecurring[];
   accounts: FinAccount[];
@@ -22,8 +23,10 @@ interface Props {
 
 const MAX_OCCURRENCES_PER_RUN = 24;
 
-export default function SettingsPanel({ userId, currency, categories, recurring, accounts, allTransactions, onChanged }: Props) {
+export default function SettingsPanel({ userId, currency, startDay, categories, recurring, accounts, allTransactions, onChanged }: Props) {
   const [savingCurrency, setSavingCurrency] = useState(false);
+  const [savingStartDay, setSavingStartDay] = useState(false);
+  const [startDayError, setStartDayError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<FinCategory | null>(null);
   const [addingCategory, setAddingCategory] = useState<"EXPENSE" | "INCOME" | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<FinRecurring | null>(null);
@@ -36,6 +39,21 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
   const expenseCats = categories.filter((c) => c.kind === "EXPENSE");
   const incomeCats = categories.filter((c) => c.kind === "INCOME");
   const dueCount = recurring.filter((r) => r.active && r.next_run_date <= format(new Date(), "yyyy-MM-dd")).length;
+
+  async function handleStartDayChange(next: number) {
+    setSavingStartDay(true);
+    setStartDayError(null);
+    const supabase = createClient();
+    const { error } = await supabase.from("fin_profiles").upsert({ user_id: userId, month_start_day: next }, { onConflict: "user_id" });
+    setSavingStartDay(false);
+    if (error) {
+      setStartDayError(error.message.includes("month_start_day")
+        ? "Run the latest supabase/budget_schema.sql in Supabase first (it adds this setting), then try again."
+        : error.message);
+      return;
+    }
+    onChanged();
+  }
 
   async function handleCurrencyChange(next: string) {
     setSavingCurrency(true);
@@ -121,6 +139,22 @@ export default function SettingsPanel({ userId, currency, categories, recurring,
         <select value={currency} disabled={savingCurrency} onChange={(e) => handleCurrencyChange(e.target.value)} className="input-field w-auto">
           {CURRENCY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+      </div>
+
+      {/* ── Budget month ── */}
+      <div className="stat-card">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">Budget month starts on</p>
+        <select value={startDay} disabled={savingStartDay} onChange={(e) => handleStartDayChange(Number(e.target.value))} className="input-field w-auto">
+          {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>{d === 1 ? "1st (calendar month)" : `${d}${["th","st","nd","rd"][(d % 10 > 3 || [11,12,13].includes(d)) ? 0 : d % 10]}`}</option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+          {startDay > 1
+            ? `A month runs from the ${startDay}th to the day before the ${startDay}th, named after the month it ends in (e.g. 25 Sep – 24 Oct is "October"). Budgets, weekly view, charts and filters all follow this.`
+            : "Set this to your payday so budgets, weekly view and charts line up with your pay cycle instead of the calendar."}
+        </p>
+        {startDayError && <p className="text-xs text-red-500 mt-2">{startDayError}</p>}
       </div>
 
       {/* ── Categories ── */}

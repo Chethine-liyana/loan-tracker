@@ -8,8 +8,12 @@
 CREATE TABLE IF NOT EXISTS public.fin_profiles (
   user_id      UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   base_currency TEXT NOT NULL DEFAULT 'USD',
+  month_start_day INT NOT NULL DEFAULT 1 CHECK (month_start_day BETWEEN 1 AND 28),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Upgrade (safe to re-run): day of the month a budget "month" starts on (e.g. 25 = payday)
+ALTER TABLE public.fin_profiles ADD COLUMN IF NOT EXISTS month_start_day INT NOT NULL DEFAULT 1 CHECK (month_start_day BETWEEN 1 AND 28);
 
 -- ── Accounts (cash / bank / card / savings / other) ─────────────
 CREATE TABLE IF NOT EXISTS public.fin_accounts (

@@ -79,6 +79,7 @@ export interface FinRecurring {
 }
 
 export interface FinProfile {
+  month_start_day?: number;
   user_id: string;
   base_currency: string;
   created_at: string;

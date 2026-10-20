@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   computeAccountBalances, buildBudgetsWithSpend, rangeForPreset, DEFAULT_CATEGORIES,
 } from "@/lib/budget/calculations";
+import { clampStartDay, currentPeriod } from "@/lib/budget/period";
+import { PeriodProvider } from "@/lib/budget/PeriodContext";
 import TimeRangeFilter from "@/components/budget/TimeRangeFilter";
 import OverviewPanel from "@/components/budget/OverviewPanel";
 import TransactionsPanel from "@/components/budget/TransactionsPanel";
@@ -39,6 +41,7 @@ export default function BudgetPage() {
   const [rawBudgets, setRawBudgets] = useState<FinBudget[]>([]);
   const [recurring, setRecurring] = useState<FinRecurring[]>([]);
   const [currency, setCurrency] = useState("USD");
+  const [startDay, setStartDay] = useState(1);
 
   const [preset, setPreset] = useState<RangePreset>("THIS_MONTH");
   const [rangeYear, setRangeYear] = useState(now.getFullYear());
@@ -72,6 +75,7 @@ export default function BudgetPage() {
       profile = { user_id: user.id, base_currency: "USD", created_at: new Date().toISOString() };
     }
     setCurrency(profile.base_currency);
+    setStartDay(clampStartDay(profile.month_start_day));
 
     if (!cats || cats.length === 0) {
       const { data: seeded } = await supabase
@@ -114,12 +118,24 @@ export default function BudgetPage() {
     setShowQuickAdd(true);
   }
 
+  // When the month-start day is loaded or changed, jump every "current month" view to the matching period.
+  useEffect(() => {
+    const p = currentPeriod(startDay);
+    const r = rangeForPreset("CUSTOM", p.year, p.month, startDay);
+    setRangeMonth(p.month);
+    setRangeYear(p.year);
+    setCustomFrom(r.from);
+    setCustomTo(r.to);
+    setBudgetMonth(p.month);
+    setBudgetYear(p.year);
+  }, [startDay]);
+
   const accountsWithBalance = useMemo(() => computeAccountBalances(accounts, transactions), [accounts, transactions]);
 
   const range = useMemo(() => {
     if (preset === "CUSTOM") return { from: customFrom, to: customTo };
-    return rangeForPreset(preset, rangeYear, rangeMonth);
-  }, [preset, rangeYear, rangeMonth, customFrom, customTo]);
+    return rangeForPreset(preset, rangeYear, rangeMonth, startDay);
+  }, [preset, rangeYear, rangeMonth, customFrom, customTo, startDay]);
 
   const filteredTransactions = useMemo(
     () => transactions.filter((t) => t.date >= range.from && t.date <= range.to),
@@ -127,14 +143,14 @@ export default function BudgetPage() {
   );
 
   const budgetsWithSpend = useMemo(
-    () => buildBudgetsWithSpend(rawBudgets, categories, transactions, budgetMonth, budgetYear),
-    [rawBudgets, categories, transactions, budgetMonth, budgetYear]
+    () => buildBudgetsWithSpend(rawBudgets, categories, transactions, budgetMonth, budgetYear, startDay),
+    [rawBudgets, categories, transactions, budgetMonth, budgetYear, startDay]
   );
 
   function handlePresetChange(p: RangePreset) {
     setPreset(p);
     if (p !== "CUSTOM") {
-      const r = rangeForPreset(p, rangeYear, rangeMonth);
+      const r = rangeForPreset(p, rangeYear, rangeMonth, startDay);
       setCustomFrom(r.from);
       setCustomTo(r.to);
     }
@@ -143,7 +159,7 @@ export default function BudgetPage() {
   function handleRangeMonthYear(m: number, y: number) {
     setRangeMonth(m);
     setRangeYear(y);
-    const r = rangeForPreset("CUSTOM", y, m);
+    const r = rangeForPreset("CUSTOM", y, m, startDay);
     setCustomFrom(r.from);
     setCustomTo(r.to);
   }
@@ -158,7 +174,7 @@ export default function BudgetPage() {
   }
 
   return (
-    <>
+    <PeriodProvider value={startDay}>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Budget</h1>
@@ -243,6 +259,7 @@ export default function BudgetPage() {
         <SettingsPanel
           userId={userId}
           currency={currency}
+          startDay={startDay}
           categories={categories}
           recurring={recurring}
           accounts={accounts}
@@ -260,6 +277,6 @@ export default function BudgetPage() {
           onSaved={fetchAll}
         />
       )}
-    </>
+    </PeriodProvider>
   );
 }

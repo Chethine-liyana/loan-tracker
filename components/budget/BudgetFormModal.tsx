@@ -6,6 +6,8 @@ import CurrencyInput from "@/components/CurrencyInput";
 import CategoryFormModal from "@/components/budget/CategoryFormModal";
 import { getIcon } from "@/lib/budget/icons";
 import { monthsAhead, sortCategoriesHierarchically } from "@/lib/budget/calculations";
+import { periodSpanText } from "@/lib/budget/period";
+import { usePeriodStart } from "@/lib/budget/PeriodContext";
 import { Plus } from "lucide-react";
 import type { FinCategory, FinBudget } from "@/types/budget";
 
@@ -25,6 +27,7 @@ interface Props {
 export default function BudgetFormModal({
   userId, categories, existingBudgetCategoryIds, budget, month, year, onClose, onSaved,
 }: Props) {
+  const startDay = usePeriodStart();
   const [localCategories, setLocalCategories] = useState(categories);
   useEffect(() => setLocalCategories(categories), [categories]);
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -87,6 +90,7 @@ export default function BudgetFormModal({
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
           {new Date(year, month - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}
+          {periodSpanText(month, year, startDay) && ` · ${periodSpanText(month, year, startDay)}`}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

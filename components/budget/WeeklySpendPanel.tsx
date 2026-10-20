@@ -8,6 +8,8 @@ import {
 import {
   buildWeeklySpend, calcWeeklyAllowance, formatCurrency,
 } from "@/lib/budget/calculations";
+import { currentPeriod, periodRange, periodSpanText } from "@/lib/budget/period";
+import { usePeriodStart } from "@/lib/budget/PeriodContext";
 import type { FinTransaction, FinCategory } from "@/types/budget";
 
 interface Props {
@@ -16,14 +18,20 @@ interface Props {
   currency: string;
 }
 
-const now = new Date();
 const PIE_COLORS_FALLBACK = ["#f59e0b", "#3b82f6", "#10b981", "#ef4444", "#8b5cf6", "#ec4899"];
 const BAR_COLOR = "#6366f1";
 const BAR_COLOR_ACTIVE = "#f97316";
 
 export default function WeeklySpendPanel({ allTransactions, categories, currency }: Props) {
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const startDay = usePeriodStart();
+  const [month, setMonth] = useState(() => currentPeriod(startDay).month);
+  const [year, setYear] = useState(() => currentPeriod(startDay).year);
+
+  useEffect(() => {
+    const p = currentPeriod(startDay);
+    setMonth(p.month);
+    setYear(p.year);
+  }, [startDay]);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -41,14 +49,15 @@ export default function WeeklySpendPanel({ allTransactions, categories, currency
   }, []);
 
   const weeks = useMemo(
-    () => buildWeeklySpend(allTransactions, categories, month, year),
-    [allTransactions, categories, month, year]
+    () => buildWeeklySpend(allTransactions, categories, month, year, startDay),
+    [allTransactions, categories, month, year, startDay]
   );
 
-  const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+  const range = periodRange(month, year, startDay);
   const transactionsThisMonth = useMemo(
-    () => allTransactions.filter((t) => t.date.startsWith(monthPrefix)),
-    [allTransactions, monthPrefix]
+    () => allTransactions.filter((t) => t.date >= range.from && t.date <= range.to),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allTransactions, range.from, range.to]
   );
 
   const income = transactionsThisMonth.filter((t) => t.kind === "INCOME").reduce((s, t) => s + t.amount, 0);
@@ -105,6 +114,9 @@ export default function WeeklySpendPanel({ allTransactions, categories, currency
             <button onClick={() => shiftMonth(-1)} className="btn-ghost px-2 py-0.5 text-xs">←</button>
             <span className="text-xs font-medium text-gray-600 dark:text-gray-300 w-24 text-center">
               {new Date(year, month - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}
+              {periodSpanText(month, year, startDay) && (
+                <span className="block text-[10px] font-normal text-gray-400 dark:text-gray-500">{periodSpanText(month, year, startDay)}</span>
+              )}
             </span>
             <button onClick={() => shiftMonth(1)} className="btn-ghost px-2 py-0.5 text-xs">→</button>
           </div>

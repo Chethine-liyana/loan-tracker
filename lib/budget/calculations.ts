@@ -25,6 +25,7 @@ import type {
   DateRange,
   RangePreset,
 } from "@/types/budget";
+import { periodRange, periodOf, periodKey, currentPeriod, shiftPeriod, periodDays } from "@/lib/budget/period";
 
 // ── Currency ────────────────────────────────────────────────────
 export function formatCurrency(amount: number, currency = "USD"): string {
@@ -124,33 +125,29 @@ export function nextOccurrence(date: Date, frequency: RecurrenceFrequency): Date
 }
 
 // ── Date range presets ───────────────────────────────────────────
-export function rangeForPreset(preset: RangePreset, year: number, month: number): DateRange {
+export function rangeForPreset(preset: RangePreset, year: number, month: number, startDay = 1): DateRange {
   const ymd = (d: Date) => format(d, "yyyy-MM-dd");
-  const now = new Date();
+  const cur = currentPeriod(startDay);
   switch (preset) {
-    case "THIS_MONTH": {
-      const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
-    }
+    case "THIS_MONTH":
+      return periodRange(cur.month, cur.year, startDay);
     case "LAST_MONTH": {
-      const d = subMonths(new Date(now.getFullYear(), now.getMonth(), 1), 1);
-      return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
+      const p = shiftPeriod(cur, -1);
+      return periodRange(p.month, p.year, startDay);
     }
     case "NEXT_MONTH": {
-      const d = addMonths(new Date(now.getFullYear(), now.getMonth(), 1), 1);
-      return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
+      const p = shiftPeriod(cur, 1);
+      return periodRange(p.month, p.year, startDay);
     }
     case "THIS_YEAR": {
-      const d = new Date(now.getFullYear(), 0, 1);
+      const d = new Date();
       return { from: ymd(startOfYear(d)), to: ymd(endOfYear(d)) };
     }
     case "ALL_TIME":
       return { from: "1970-01-01", to: "2100-12-31" };
     case "CUSTOM":
-    default: {
-      const d = new Date(year, month - 1, 1);
-      return { from: ymd(startOfMonth(d)), to: ymd(endOfMonth(d)) };
-    }
+    default:
+      return periodRange(month, year, startDay);
   }
 }
 
@@ -165,11 +162,14 @@ export interface BudgetPace {
 }
 
 /** Compares spend-so-far against how far through the month we are. */
-export function calcBudgetPace(spent: number, limit: number, month: number, year: number): BudgetPace {
-  const now = new Date();
-  const isCurrentPeriod = now.getFullYear() === year && now.getMonth() + 1 === month;
-  const daysInMonth = getDaysInMonth(new Date(year, month - 1, 1));
-  const dayOfMonth = isCurrentPeriod ? now.getDate() : daysInMonth;
+export function calcBudgetPace(spent: number, limit: number, month: number, year: number, startDay = 1): BudgetPace {
+  const cur = currentPeriod(startDay);
+  const isCurrentPeriod = cur.year === year && cur.month === month;
+  const daysInMonth = periodDays(month, year, startDay);
+  const range = periodRange(month, year, startDay);
+  const dayOfMonth = isCurrentPeriod
+    ? Math.min(differenceInCalendarDays(new Date(), parseISO(range.from)) + 1, daysInMonth)
+    : daysInMonth;
 
   const pctSpent = limit > 0 ? (spent / limit) * 100 : 0;
   const pctElapsed = (dayOfMonth / daysInMonth) * 100;
@@ -185,14 +185,14 @@ export function calcBudgetPace(spent: number, limit: number, month: number, year
 }
 
 // ── Safe-to-spend / burn rate ─────────────────────────────────────
-export function calcSafeToSpend(totalBudget: number, spentSoFar: number): {
+export function calcSafeToSpend(totalBudget: number, spentSoFar: number, startDay = 1): {
   remaining: number;
   daysLeft: number;
   perDay: number;
 } {
-  const now = new Date();
-  const daysInMonth = getDaysInMonth(now);
-  const daysLeft = Math.max(daysInMonth - now.getDate() + 1, 1);
+  const cur = currentPeriod(startDay);
+  const end = parseISO(periodRange(cur.month, cur.year, startDay).to);
+  const daysLeft = Math.max(differenceInCalendarDays(end, new Date()) + 1, 1);
   const remaining = Math.max(totalBudget - spentSoFar, 0);
   return { remaining, daysLeft, perDay: remaining / daysLeft };
 }
@@ -311,17 +311,17 @@ export function buildBudgetsWithSpend(
   categories: FinCategory[],
   transactions: FinTransaction[],
   month: number,
-  year: number
+  year: number,
+  startDay = 1
 ): BudgetWithSpend[] {
   const catMap = new Map(categories.map((c) => [c.id, c]));
-  const monthStr = String(month).padStart(2, "0");
-  const prefix = `${year}-${monthStr}`;
+  const range = periodRange(month, year, startDay);
 
   return budgets
     .filter((b) => b.month === month && b.year === year)
     .map((b) => {
       const spent = transactions
-        .filter((t) => t.kind === "EXPENSE" && t.category_id === b.category_id && t.date.startsWith(prefix))
+        .filter((t) => t.kind === "EXPENSE" && t.category_id === b.category_id && t.date >= range.from && t.date <= range.to)
         .reduce((s, t) => s + t.amount, 0);
       return { ...b, spent, category: catMap.get(b.category_id)! };
     })
@@ -329,16 +329,12 @@ export function buildBudgetsWithSpend(
     .sort((a, b) => a.category.name.localeCompare(b.category.name));
 }
 
-export function buildMonthlyInflowOutflow(transactions: FinTransaction[], months = 6) {
-  const now = new Date();
-  const buckets = Array.from({ length: months }, (_, i) => {
-    const d = subMonths(startOfMonth(now), months - 1 - i);
-    return { start: d, end: endOfMonth(d), label: format(d, "MMM"), income: 0, expense: 0 };
-  });
+export function buildMonthlyInflowOutflow(transactions: FinTransaction[], months = 6, startDay = 1) {
+  const buckets = monthKeys(months, startDay).map((b) => ({ ...b, income: 0, expense: 0 }));
+  const byKey = new Map(buckets.map((b) => [b.key, b]));
 
   for (const t of transactions) {
-    const d = parseISO(t.date);
-    const bucket = buckets.find((b) => d >= b.start && d <= b.end);
+    const bucket = byKey.get(periodKey(t.date, startDay));
     if (!bucket) continue;
     if (t.kind === "INCOME") bucket.income += t.amount;
     else if (t.kind === "EXPENSE") bucket.expense += t.amount;
@@ -348,11 +344,12 @@ export function buildMonthlyInflowOutflow(transactions: FinTransaction[], months
 }
 
 // ── Multi-month trends ───────────────────────────────────────────
-function monthKeys(months: number) {
-  const now = startOfMonth(new Date());
+function monthKeys(months: number, startDay = 1) {
+  const cur = currentPeriod(startDay);
   return Array.from({ length: months }, (_, i) => {
-    const d = subMonths(now, months - 1 - i);
-    return { key: format(d, "yyyy-MM"), label: format(d, months > 6 ? "MMM yy" : "MMM") };
+    const p = shiftPeriod(cur, -(months - 1 - i));
+    const d = new Date(p.year, p.month - 1, 1);
+    return { key: `${p.year}-${String(p.month).padStart(2, "0")}`, label: format(d, months > 6 ? "MMM yy" : "MMM") };
   });
 }
 
@@ -369,16 +366,17 @@ export function buildCategoryTrend(
   transactions: FinTransaction[],
   categories: FinCategory[],
   months = 6,
-  topN = 6
+  topN = 6,
+  startDay = 1
 ): CategoryTrend {
   const catMap = new Map(categories.map((c) => [c.id, c]));
-  const buckets = monthKeys(months);
+  const buckets = monthKeys(months, startDay);
   const totals = new Map<string, number>();
   const perMonth = new Map<string, Map<string, number>>(buckets.map((b) => [b.key, new Map()]));
 
   for (const t of transactions) {
     if (t.kind !== "EXPENSE" || !t.category_id) continue;
-    const m = perMonth.get(t.date.slice(0, 7));
+    const m = perMonth.get(periodKey(t.date, startDay));
     if (!m) continue;
     const cat = catMap.get(t.category_id);
     const id = cat?.parent_id && catMap.has(cat.parent_id) ? cat.parent_id : t.category_id;
@@ -422,11 +420,11 @@ export interface SavingsRatePoint {
 }
 
 /** (income − expense) ÷ income per month. Transfers are ignored. */
-export function buildSavingsRate(transactions: FinTransaction[], months = 12): SavingsRatePoint[] {
-  const buckets = monthKeys(months);
+export function buildSavingsRate(transactions: FinTransaction[], months = 12, startDay = 1): SavingsRatePoint[] {
+  const buckets = monthKeys(months, startDay);
   const agg = new Map(buckets.map((b) => [b.key, { income: 0, expense: 0 }]));
   for (const t of transactions) {
-    const a = agg.get(t.date.slice(0, 7));
+    const a = agg.get(periodKey(t.date, startDay));
     if (!a) continue;
     if (t.kind === "INCOME") a.income += t.amount;
     else if (t.kind === "EXPENSE") a.expense += t.amount;
@@ -450,36 +448,33 @@ export interface WeekSlice {
 }
 
 /**
- * Splits a calendar month into simple 7-day buckets (days 1-7, 8-14, ...),
- * so a 31-day month has 5 "weeks" and a 28-day month has 4.
+ * Splits a budget period into simple 7-day buckets starting from the first
+ * day of the period, so a 31-day period has 5 "weeks" and a 28-day one has 4.
  */
 export function buildWeeklySpend(
   transactions: FinTransaction[],
   categories: FinCategory[],
   month: number,
-  year: number
+  year: number,
+  startDay = 1
 ): WeekSlice[] {
-  const daysInMonth = getDaysInMonth(new Date(year, month - 1, 1));
-  const numWeeks = Math.ceil(daysInMonth / 7);
-  const monthStr = String(month).padStart(2, "0");
+  const range = periodRange(month, year, startDay);
+  const first = parseISO(range.from);
+  const totalDays = periodDays(month, year, startDay);
+  const numWeeks = Math.ceil(totalDays / 7);
 
-  const weeks: WeekSlice[] = Array.from({ length: numWeeks }, (_, i) => {
-    const startDay = i * 7 + 1;
-    const endDay = Math.min(startDay + 6, daysInMonth);
-    return {
-      label: `Week ${i + 1}`,
-      from: `${year}-${monthStr}-${String(startDay).padStart(2, "0")}`,
-      to: `${year}-${monthStr}-${String(endDay).padStart(2, "0")}`,
-      total: 0,
-      breakdown: [] as CategorySlice[],
-    };
-  });
+  const weeks: WeekSlice[] = Array.from({ length: numWeeks }, (_, i) => ({
+    label: `Week ${i + 1}`,
+    from: format(addDays(first, i * 7), "yyyy-MM-dd"),
+    to: format(addDays(first, Math.min(i * 7 + 6, totalDays - 1)), "yyyy-MM-dd"),
+    total: 0,
+    breakdown: [] as CategorySlice[],
+  }));
 
   const byWeek: FinTransaction[][] = Array.from({ length: numWeeks }, () => []);
   for (const t of transactions) {
-    if (t.kind !== "EXPENSE" || !t.date.startsWith(`${year}-${monthStr}`)) continue;
-    const day = Number(t.date.slice(8, 10));
-    const idx = Math.min(Math.floor((day - 1) / 7), numWeeks - 1);
+    if (t.kind !== "EXPENSE" || t.date < range.from || t.date > range.to) continue;
+    const idx = Math.min(Math.floor(differenceInCalendarDays(parseISO(t.date), first) / 7), numWeeks - 1);
     byWeek[idx].push(t);
     weeks[idx].total += t.amount;
   }
