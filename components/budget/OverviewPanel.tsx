@@ -12,6 +12,7 @@ import {
 import { getIcon } from "@/lib/budget/icons";
 import SummaryCardExport from "@/components/budget/SummaryCardExport";
 import WeeklySpendPanel from "@/components/budget/WeeklySpendPanel";
+import TrendCharts from "@/components/budget/TrendCharts";
 import type { FinTransaction, FinCategory, FinAccount, DateRange, FinBudget } from "@/types/budget";
 
 interface Props {
@@ -206,6 +207,9 @@ export default function OverviewPanel({
           </div>
         </div>
       </div>
+
+      {/* ── Month-over-month trends ── */}
+      <TrendCharts allTransactions={allTransactions} categories={categories} currency={currency} />
 
       {/* ── Weekly breakdown ── */}
       <WeeklySpendPanel

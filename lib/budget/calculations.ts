@@ -347,6 +347,99 @@ export function buildMonthlyInflowOutflow(transactions: FinTransaction[], months
   return buckets.map(({ label, income, expense }) => ({ label, income, expense }));
 }
 
+// ── Multi-month trends ───────────────────────────────────────────
+function monthKeys(months: number) {
+  const now = startOfMonth(new Date());
+  return Array.from({ length: months }, (_, i) => {
+    const d = subMonths(now, months - 1 - i);
+    return { key: format(d, "yyyy-MM"), label: format(d, months > 6 ? "MMM yy" : "MMM") };
+  });
+}
+
+export interface CategoryTrend {
+  series: { id: string; name: string; color: string }[];
+  rows: ({ label: string; month: string } & Record<string, number | string>)[];
+}
+
+/**
+ * Expense per category per month. Subcategories roll up into their parent, and
+ * everything beyond the `topN` biggest categories is grouped as "Other".
+ */
+export function buildCategoryTrend(
+  transactions: FinTransaction[],
+  categories: FinCategory[],
+  months = 6,
+  topN = 6
+): CategoryTrend {
+  const catMap = new Map(categories.map((c) => [c.id, c]));
+  const buckets = monthKeys(months);
+  const totals = new Map<string, number>();
+  const perMonth = new Map<string, Map<string, number>>(buckets.map((b) => [b.key, new Map()]));
+
+  for (const t of transactions) {
+    if (t.kind !== "EXPENSE" || !t.category_id) continue;
+    const m = perMonth.get(t.date.slice(0, 7));
+    if (!m) continue;
+    const cat = catMap.get(t.category_id);
+    const id = cat?.parent_id && catMap.has(cat.parent_id) ? cat.parent_id : t.category_id;
+    m.set(id, (m.get(id) ?? 0) + t.amount);
+    totals.set(id, (totals.get(id) ?? 0) + t.amount);
+  }
+
+  const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const top = ranked.slice(0, topN);
+  const hasOther = ranked.length > topN;
+
+  const series = top.map((id) => ({
+    id,
+    name: catMap.get(id)?.name ?? "Unknown",
+    color: catMap.get(id)?.color ?? "#64748b",
+  }));
+  if (hasOther) series.push({ id: "__other", name: "Other", color: "#94a3b8" });
+
+  const rows = buckets.map((b) => {
+    const m = perMonth.get(b.key)!;
+    const row: Record<string, number | string> = { label: b.label, month: b.key };
+    let other = 0;
+    for (const [id, amt] of m) {
+      if (top.includes(id)) row[id] = amt;
+      else other += amt;
+    }
+    for (const id of top) row[id] = (row[id] as number) ?? 0;
+    if (hasOther) row.__other = other;
+    return row as CategoryTrend["rows"][number];
+  });
+
+  return { series, rows };
+}
+
+export interface SavingsRatePoint {
+  label: string;
+  income: number;
+  expense: number;
+  saved: number;
+  rate: number | null; // percent; null when there was no income that month
+}
+
+/** (income − expense) ÷ income per month. Transfers are ignored. */
+export function buildSavingsRate(transactions: FinTransaction[], months = 12): SavingsRatePoint[] {
+  const buckets = monthKeys(months);
+  const agg = new Map(buckets.map((b) => [b.key, { income: 0, expense: 0 }]));
+  for (const t of transactions) {
+    const a = agg.get(t.date.slice(0, 7));
+    if (!a) continue;
+    if (t.kind === "INCOME") a.income += t.amount;
+    else if (t.kind === "EXPENSE") a.expense += t.amount;
+  }
+  return buckets.map((b) => {
+    const { income, expense } = agg.get(b.key)!;
+    return {
+      label: b.label, income, expense, saved: income - expense,
+      rate: income > 0 ? ((income - expense) / income) * 100 : null,
+    };
+  });
+}
+
 // ── Weekly spend within a month ──────────────────────────────────
 export interface WeekSlice {
   label: string;        // "Week 1"
