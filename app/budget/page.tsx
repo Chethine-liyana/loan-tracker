@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   computeAccountBalances, buildBudgetsWithSpend, rangeForPreset, DEFAULT_CATEGORIES,
 } from "@/lib/budget/calculations";
+import { format, parseISO } from "date-fns";
 import { clampStartDay, currentPeriod } from "@/lib/budget/period";
 import { PeriodProvider } from "@/lib/budget/PeriodContext";
 import TimeRangeFilter from "@/components/budget/TimeRangeFilter";
@@ -211,6 +212,7 @@ export default function BudgetPage() {
           onPresetChange={handlePresetChange} onYearChange={(y) => handleRangeMonthYear(rangeMonth, y)}
           onMonthChange={(m) => handleRangeMonthYear(m, rangeYear)}
           onCustomFromChange={setCustomFrom} onCustomToChange={setCustomTo}
+          rangeText={preset === "ALL_TIME" ? "" : `${format(parseISO(range.from), "d MMM")} – ${format(parseISO(range.to), "d MMM yyyy")}`}
         />
       )}
 

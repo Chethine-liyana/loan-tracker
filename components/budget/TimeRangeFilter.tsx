@@ -13,6 +13,7 @@ interface Props {
   onMonthChange: (m: number) => void;
   onCustomFromChange: (d: string) => void;
   onCustomToChange: (d: string) => void;
+  rangeText?: string;
 }
 
 const PRESETS: { value: RangePreset; label: string }[] = [
@@ -30,7 +31,7 @@ const MONTH_NAMES = [
 
 export default function TimeRangeFilter({
   preset, year, month, customFrom, customTo,
-  onPresetChange, onYearChange, onMonthChange, onCustomFromChange, onCustomToChange,
+  onPresetChange, onYearChange, onMonthChange, onCustomFromChange, onCustomToChange, rangeText,
 }: Props) {
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: 6 }, (_, i) => thisYear - i);
@@ -53,6 +54,10 @@ export default function TimeRangeFilter({
             </button>
           ))}
         </div>
+
+        {rangeText && (
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{rangeText}</span>
+        )}
 
         {preset === "CUSTOM" && (
           <div className="flex items-center gap-2">
