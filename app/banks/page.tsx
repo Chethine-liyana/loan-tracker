@@ -77,10 +77,11 @@ export default function BanksPage() {
     );
   }, [contacts, search]);
 
-  async function handleCopy(c: BankContact) {
-    if (await copyText(`${c.name}\n${c.account_no}`)) {
-      setCopiedId(c.id);
-      setTimeout(() => setCopiedId((id) => (id === c.id ? null : id)), 1500);
+  async function handleCopy(c: BankContact, field: "name" | "account_no") {
+    const key = `${c.id}:${field}`;
+    if (await copyText(c[field])) {
+      setCopiedId(key);
+      setTimeout(() => setCopiedId((id) => (id === key ? null : id)), 1500);
     }
   }
 
@@ -102,7 +103,7 @@ export default function BanksPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Bank Details</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Tap Copy to grab the name and account number together.</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Tap Name or Account No to copy it.</p>
         </div>
         <button onClick={() => setShowAdd(true)} disabled={!!loadError} className="btn-primary text-sm px-3 py-1.5 shrink-0">+ Add</button>
       </div>
@@ -135,14 +136,21 @@ export default function BanksPage() {
                 </button>
               </div>
             </div>
-            <button onClick={() => handleCopy(c)}
-                    className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      copiedId === c.id
-                        ? "bg-green-500 text-white"
-                        : "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
-                    }`}>
-              {copiedId === c.id ? "✓ Copied" : "📋 Copy name & account no"}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              {([["name", "Name"], ["account_no", "Account No"]] as const).map(([field, label]) => {
+                const copied = copiedId === `${c.id}:${field}`;
+                return (
+                  <button key={field} onClick={() => handleCopy(c, field)}
+                          className={`py-2 rounded-lg text-sm font-semibold transition-colors ${
+                            copied
+                              ? "bg-green-500 text-white"
+                              : "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                          }`}>
+                    {copied ? "✓ Copied" : `📋 ${label}`}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ))}
         {!loadError && contacts.length === 0 && (
