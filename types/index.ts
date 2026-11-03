@@ -111,3 +111,15 @@ export interface LoanSnapshot {
   event: 'BASELINE' | 'PAYMENT' | 'ADJUSTMENT';
   created_at: string;
 }
+
+// ── Saved bank details (yours and friends') shown on the Banks tab ──
+export interface BankContact {
+  id: string;
+  user_id: string;
+  nickname: string | null;
+  name: string;
+  bank: string;
+  branch: string | null;
+  account_no: string;
+  created_at: string;
+}

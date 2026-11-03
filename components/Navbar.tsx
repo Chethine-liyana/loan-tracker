@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 const NAV_LINKS = [
   { href: "/dashboard", label: "Loans", emoji: "🏦" },
   { href: "/budget", label: "Budget", emoji: "💰" },
+  { href: "/banks", label: "Banks", emoji: "💳" },
 ];
 
 export default function Navbar({ email }: { email: string }) {
