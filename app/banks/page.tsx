@@ -77,9 +77,13 @@ export default function BanksPage() {
     );
   }, [contacts, search]);
 
-  async function handleCopy(c: BankContact, field: "name" | "account_no") {
+  async function handleCopy(c: BankContact, field: "name" | "account_no" | "all") {
     const key = `${c.id}:${field}`;
-    if (await copyText(c[field])) {
+    const text = field === "all"
+      ? [`Name: ${c.name}`, `Bank: ${c.bank}`, c.branch && `Branch: ${c.branch}`, `Account No: ${c.account_no}`]
+          .filter(Boolean).join("\n")
+      : c[field];
+    if (await copyText(text)) {
       setCopiedId(key);
       setTimeout(() => setCopiedId((id) => (id === key ? null : id)), 1500);
     }
@@ -103,7 +107,7 @@ export default function BanksPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Bank Details</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Tap Name or Account No to copy it.</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Tap Name or Account No to copy it, or copy all details at once.</p>
         </div>
         <button onClick={() => setShowAdd(true)} disabled={!!loadError} className="btn-primary text-sm px-3 py-1.5 shrink-0">+ Add</button>
       </div>
@@ -137,11 +141,11 @@ export default function BanksPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {([["name", "Name"], ["account_no", "Account No"]] as const).map(([field, label]) => {
+              {([["name", "Name"], ["account_no", "Account No"], ["all", "Copy all details"]] as const).map(([field, label]) => {
                 const copied = copiedId === `${c.id}:${field}`;
                 return (
                   <button key={field} onClick={() => handleCopy(c, field)}
-                          className={`py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          className={`${field === "all" ? "col-span-2 " : ""}py-2 rounded-lg text-sm font-semibold transition-colors ${
                             copied
                               ? "bg-green-500 text-white"
                               : "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
