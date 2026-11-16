@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import LoanCard from "@/components/LoanCard";
 import AddLoanModal from "@/components/AddLoanModal";
 import PaymentPlanner from "@/components/PaymentPlanner";
+import PayoffPlanner from "@/components/PayoffPlanner";
 import PortfolioCharts from "@/components/PortfolioCharts";
 import InterestTrendChart from "@/components/InterestTrendChart";
 import type { Loan, LoanType, LoanSnapshot, CategoryStats, DashboardStats } from "@/types";
@@ -173,6 +174,7 @@ export default function DashboardPage() {
   const [showAdd,   setShowAdd]   = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
+  const [showPayoff, setShowPayoff] = useState(false);
 
   const fetchLoans = useCallback(async () => {
     const supabase = createClient();
@@ -333,6 +335,21 @@ export default function DashboardPage() {
         </button>
       )}
 
+      {/* ── Payoff planner: compares methods and projects the payoff date (Gold Pawn only) ── */}
+      {activeTab === "GOLD_PAWN" && visibleLoans.length > 0 && (
+        <button
+          onClick={() => setShowPayoff(true)}
+          className="w-full mb-5 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-700
+                     bg-emerald-50/50 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20
+                     text-emerald-800 dark:text-emerald-300 font-semibold text-sm px-4 py-3
+                     flex items-center justify-center gap-2 transition-all duration-150
+                     hover:border-emerald-400 hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <span className="text-lg leading-none">📅</span>
+          Payoff planner — how long, and which method is cheapest
+        </button>
+      )}
+
       {/* ── Loan cards ── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
@@ -400,6 +417,14 @@ export default function DashboardPage() {
         <PaymentPlanner
           loans={activeLoans.filter((l) => l.loan_type === "GOLD_PAWN")}
           onClose={() => setShowPlanner(false)}
+          onApplied={fetchLoans}
+        />
+      )}
+
+      {showPayoff && (
+        <PayoffPlanner
+          loans={activeLoans.filter((l) => l.loan_type === "GOLD_PAWN")}
+          onClose={() => setShowPayoff(false)}
           onApplied={fetchLoans}
         />
       )}
