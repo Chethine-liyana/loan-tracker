@@ -13,6 +13,9 @@ import type { Loan, LoanType, LoanSnapshot, CategoryStats, DashboardStats } from
 
 type Tab = "GOLD_PAWN" | "HOUSING";
 
+/** Fully paid off — hidden from the cards, counts, alerts and planner unless "show settled" is on. */
+const isSettled = (l: Loan) => l.current_principal_remaining < 0.005;
+
 function buildStats(loans: Loan[]): DashboardStats & { totalDailyCost: number } {
   const empty = (): CategoryStats => ({
     totalPrincipal: 0,
@@ -34,12 +37,16 @@ function buildStats(loans: Loan[]): DashboardStats & { totalDailyCost: number } 
     bucket.totalPrincipal     += l.current_principal_remaining;
     bucket.totalInterestPaid  += l.total_historical_interest_paid;
     bucket.totalAccruedNow    += accrued;
-    bucket.count              += 1;
 
     overall.totalPrincipal    += l.current_principal_remaining;
     overall.totalInterestPaid += l.total_historical_interest_paid;
     overall.totalAccruedNow   += accrued;
-    overall.count             += 1;
+
+    // Settled loans still count toward interest paid (history) but not toward the loan counts.
+    if (!isSettled(l)) {
+      bucket.count  += 1;
+      overall.count += 1;
+    }
     totalDailyCost            += daily;
   }
 
@@ -165,6 +172,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("GOLD_PAWN");
   const [showAdd,   setShowAdd]   = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
+  const [showSettled, setShowSettled] = useState(false);
 
   const fetchLoans = useCallback(async () => {
     const supabase = createClient();
@@ -181,7 +189,11 @@ export default function DashboardPage() {
   useEffect(() => { fetchLoans(); }, [fetchLoans]);
 
   const stats        = buildStats(loans);
-  const visibleLoans = loans.filter((l) => l.loan_type === activeTab);
+  const activeLoans  = loans.filter((l) => !isSettled(l));
+  const tabLoans     = loans.filter((l) => l.loan_type === activeTab);
+  const settledLoans = tabLoans.filter(isSettled);
+  const visibleLoans = tabLoans.filter((l) => !isSettled(l));
+  const shownLoans   = showSettled ? tabLoans : visibleLoans;
 
   const TAB_META: Record<Tab, { label: string; emoji: string }> = {
     GOLD_PAWN: { label: "Gold Pawn Portfolio",    emoji: "🪙" },
@@ -195,9 +207,9 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Liabilities</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {loans.length === 0
-              ? "No loans yet"
-              : `${loans.length} active loan${loans.length !== 1 ? "s" : ""} across all categories`}
+            {activeLoans.length === 0
+              ? (loans.length === 0 ? "No loans yet" : "All loans settled")
+              : `${activeLoans.length} active loan${activeLoans.length !== 1 ? "s" : ""} across all categories`}
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
@@ -206,7 +218,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <RenewalAlertsBanner loans={loans} />
+      <RenewalAlertsBanner loans={activeLoans} />
 
       {loans.length > 0 && (
         <>
@@ -263,7 +275,7 @@ export default function DashboardPage() {
       {/* ── Tabs ── */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 mb-6">
         {(["GOLD_PAWN", "HOUSING"] as Tab[]).map((tab) => {
-          const count = loans.filter((l) => l.loan_type === tab).length;
+          const count = activeLoans.filter((l) => l.loan_type === tab).length;
           return (
             <button
               key={tab}
@@ -292,9 +304,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Interest over time (scoped to the active tab) ── */}
-      {visibleLoans.length > 0 && (
+      {shownLoans.length > 0 && (
         <InterestTrendChart
-          loans={visibleLoans}
+          loans={shownLoans}
           snapshots={snapshots}
           title={`${TAB_META[activeTab].emoji} Interest Over Time`}
         />
@@ -327,7 +339,7 @@ export default function DashboardPage() {
           <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-4" />
           <p className="text-sm">Loading accounts…</p>
         </div>
-      ) : visibleLoans.length === 0 ? (
+      ) : tabLoans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <span className="text-5xl mb-4">{TAB_META[activeTab].emoji}</span>
           <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -341,11 +353,39 @@ export default function DashboardPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {visibleLoans.map((loan) => (
-            <LoanCard key={loan.id} loan={loan} onUpdated={fetchLoans} />
-          ))}
-        </div>
+        <>
+          {visibleLoans.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {visibleLoans.map((loan) => (
+                <LoanCard key={loan.id} loan={loan} onUpdated={fetchLoans} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-10">
+              🎉 All {activeTab === "GOLD_PAWN" ? "gold pawn" : "housing"} accounts are settled.
+            </p>
+          )}
+
+          {settledLoans.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowSettled((s) => !s)}
+                className="w-full mt-5 btn-secondary text-sm"
+              >
+                {showSettled
+                  ? `Hide settled (${settledLoans.length})`
+                  : `Show settled (${settledLoans.length})`}
+              </button>
+              {showSettled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 opacity-60">
+                  {settledLoans.map((loan) => (
+                    <LoanCard key={loan.id} loan={loan} onUpdated={fetchLoans} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {showAdd && (
@@ -358,7 +398,7 @@ export default function DashboardPage() {
 
       {showPlanner && (
         <PaymentPlanner
-          loans={loans.filter((l) => l.loan_type === "GOLD_PAWN")}
+          loans={activeLoans.filter((l) => l.loan_type === "GOLD_PAWN")}
           onClose={() => setShowPlanner(false)}
           onApplied={fetchLoans}
         />
